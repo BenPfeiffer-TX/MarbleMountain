@@ -80,13 +80,22 @@ $$a_{\text{drag}} = -v_s \cdot D_{\text{roll}} \quad (D_{\text{roll}} = 0.30)$$
 ## 6. Departure & Game Over Modal
 *Component Implementation*: [`src/ui/GameOverModal.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/ui/GameOverModal.ts)
 
-### 1. Departure from Bar Tips
-- Condition: $|s| > W_{\text{half}} = 331.2\text{px}$.
-- Converts bar velocity into free-fall projectile world coordinates:
-  $$V_x = v_s \cos\theta - s \omega \sin\theta$$
-  $$V_y = v_s \sin\theta + s \omega \cos\theta$$
-- Gravity accelerates the ball downwards ($V_y += g \cdot dt$).
-- Off-screen boundary: $Y > 1280 + 70\text{px}$ or $X \notin [-70, 790]$.
+### 1. Surface Collision & Corner Roll-Off Mechanics
+- **Surface Collision Geometry**:
+  - Rather than treating the marble as a single point that immediately drops as soon as its center passes the bar tip ($|s| > W_{\text{half}}$), collision is measured against the outer spherical surface of the marble.
+  - When the marble rolls past the bar corner ($|s| > W_{\text{half}}$), the marble maintains exact tangential contact with the corner at $(\pm W_{\text{half}}, H_{\text{bar}}/2)$:
+    $$u = \frac{H_{\text{bar}}}{2} + \sqrt{R^2 - \Delta s^2} \quad (\Delta s = |s| - W_{\text{half}})$$
+    $$\text{distance to corner} = \sqrt{\Delta s^2 + (u - H_{\text{bar}}/2)^2} = R$$
+  - As $\Delta s$ increases from $0$ to $R \cdot 0.88$ ($\approx 22\text{px}$), the marble visibly dips and smoothly rounds the corner of the bar without clipping through the end cap.
+- **Corner Kinematics & Save Window**:
+  - Tangential corner angle: $\alpha = \arcsin(\Delta s / R)$.
+  - Effective gravitational slope: $\theta_{\text{eff}} = \theta \pm \alpha$.
+  - As the ball rounds the edge, acceleration increases down the curve. However, if the player quickly counters by tilting that side of the bar upward ($|\theta| > \alpha$), $\theta_{\text{eff}}$ reverses, decelerating the ball and allowing skilled players to roll the marble back onto the flat top of the bar.
+- **Detachment & Free-Fall Transition**:
+  - Detachment threshold: $\Delta s \ge R \times 0.88$ (corner rotation $\alpha \approx 62^\circ$).
+  - Once detached, relative velocity components along the tangent arc ($v_s^{\text{bar}} = v_s \cos\alpha, v_u^{\text{bar}} = -|v_s| \sin\alpha$) and bar angular rotation velocity ($\vec{\omega} \times \vec{r}$) are converted into world-space projectile velocities ($V_x, V_y$).
+  - The marble launches outward and downward completely clear of the bar's boundary with zero visual clipping.
+  - Off-screen boundary: $Y > 1280 + 70\text{px}$ or $X \notin [-70, 790]$.
 
 ### 2. Frosted Glass Effect
 - Background scene camera and play area container receive post-processing Gaussian blur (`postFX.addBlur(2, 4, 4, 2)`).

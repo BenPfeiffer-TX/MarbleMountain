@@ -17,6 +17,7 @@ export const MARBLE_CONFIG = {
   rollingDrag: 0.30, // Subtle linear viscous rolling drag for smooth speed feel
   staticFrictionAngleRad: 0.010, // Small threshold (~0.57 deg) below which stationary marble doesn't drift
   maxRollSpeed: 850, // Maximum linear velocity along the bar (px/s)
+  edgeRollDetachRatio: 0.88, // Center can travel 88% of radius past bar tip (~22px) rounding the corner before detaching
 
   // Arrival Inertia & Bounce (Entering play scene from title screen)
   arrivalLiftSpeed: 280, // Upward velocity (px/s) when bar comes to rest, causing ball to lift off (~28px apex)

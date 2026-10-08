@@ -239,13 +239,27 @@ export class Marble extends Phaser.GameObjects.Container {
       return;
     }
 
-    // --- STATE 3: ROLLING ON THE BAR ---
+    // --- STATE 3: ROLLING ON THE BAR & CORNER ROLL-OFF ---
     if (this.marbleState === MarbleState.ROLLING) {
       const sinTilt = Math.sin(barAngle);
       const cosTilt = Math.cos(barAngle);
 
-      // 1. Gravitational acceleration along the inclined plane (rolling without slipping: 5/7 * g * sin(theta))
-      const aGravity = MARBLE_CONFIG.rollingAccelerationFactor * MARBLE_CONFIG.gravity * sinTilt;
+      // Distance past the flat bar tip (|s| - barHalfWidth)
+      const deltaS = Math.abs(this.s) - barHalfWidth;
+      const isPastEdge = deltaS > 0;
+      const cornerSign = Math.sign(this.s);
+
+      // Corner arc angle alpha around the tip (0 = flat top, pi/2 = 90 deg down the side)
+      const clampedDeltaS = isPastEdge ? Math.min(r * 0.98, deltaS) : 0;
+      const cornerAlpha = isPastEdge ? Math.asin(clampedDeltaS / r) : 0;
+
+      // 1. Gravitational acceleration:
+      // When on the flat bar: 5/7 * g * sin(theta)
+      // When rounding the corner: effective slope increases by cornerAlpha in the direction of the corner!
+      const effectiveAngle = isPastEdge
+        ? barAngle + cornerSign * cornerAlpha
+        : barAngle;
+      const aGravity = MARBLE_CONFIG.rollingAccelerationFactor * MARBLE_CONFIG.gravity * Math.sin(effectiveAngle);
 
       // 2. Centrifugal acceleration outward from center: s * omega^2
       const aCentrifugal = this.s * (barAngularVel * barAngularVel);
@@ -255,8 +269,9 @@ export class Marble extends Phaser.GameObjects.Container {
       const frictionMagnitude = Math.min(MARBLE_CONFIG.rollingFriction, Math.abs(this.v_s) / dt);
       const friction = this.v_s !== 0 ? -Math.sign(this.v_s) * frictionMagnitude : 0;
 
-      // Static friction: When nearly flat and essentially stopped, hold position without micro-drift
+      // Static friction: When on the flat bar, nearly horizontal, and essentially stopped
       if (
+        !isPastEdge &&
         Math.abs(sinTilt) < MARBLE_CONFIG.staticFrictionAngleRad &&
         Math.abs(this.v_s) < 1.0
       ) {
@@ -281,22 +296,58 @@ export class Marble extends Phaser.GameObjects.Container {
         this.bodySprite.setRotation(this.rollAngle);
       }
 
-      // Calculate world position on the bar surface
-      const dPerp = barHeight / 2 + r;
-      this.x = barX + this.s * cosTilt + dPerp * sinTilt;
-      this.y = barY + this.s * sinTilt - dPerp * cosTilt;
+      // 4. Perpendicular height u above bar centerline:
+      // When on the flat bar: u = barHeight / 2 + r
+      // When rounding the corner: distance to corner (barHalfWidth, barHeight/2) is EXACTLY r:
+      // u = barHeight / 2 + sqrt(r^2 - deltaS^2)
+      // This ensures the marble's outer surface is in exact tangential contact with the corner!
+      const currentDeltaS = Math.abs(this.s) - barHalfWidth;
+      let u = barHeight / 2 + r;
+      if (currentDeltaS > 0) {
+        const cDeltaS = Math.min(r * 0.98, currentDeltaS);
+        u = barHeight / 2 + Math.sqrt(Math.max(0, r * r - cDeltaS * cDeltaS));
+      }
 
-      // Check if marble has rolled off the ends of the bar
-      if (Math.abs(this.s) > barHalfWidth) {
+      // Calculate world position on the bar surface (or corner)
+      this.x = barX + this.s * cosTilt + u * sinTilt;
+      this.y = barY + this.s * sinTilt - u * cosTilt;
+
+      // Dynamic drop shadow adjustment when rounding the corner
+      const maxDeltaS = r * MARBLE_CONFIG.edgeRollDetachRatio;
+      if (currentDeltaS > 0) {
+        const fade = Math.max(0, 1 - currentDeltaS / maxDeltaS);
+        this.dropShadow.setAlpha(MARBLE_CONFIG.shadowAlpha * fade);
+        this.dropShadow.setScale(Math.max(0.35, fade));
+      } else {
+        this.dropShadow.setAlpha(MARBLE_CONFIG.shadowAlpha);
+        this.dropShadow.setScale(1);
+      }
+
+      // 5. Edge Detachment: Only transition to free-fall when the marble has fully rolled
+      // around the corner and its trailing edge / center of mass clears the detachment threshold
+      if (currentDeltaS >= maxDeltaS) {
         this.marbleState = MarbleState.FALLING;
         this.worldX = this.x;
         this.worldY = this.y;
 
-        // Tangential departure velocity in world space
-        this.velX = this.v_s * cosTilt - this.s * barAngularVel * sinTilt;
-        this.velY = this.v_s * sinTilt + this.s * barAngularVel * cosTilt;
+        const detachAlpha = Math.asin(Phaser.Math.Clamp(currentDeltaS / r, 0, 0.98));
 
-        // Fade shadow off when leaving the bar surface
+        // Linear velocity components in bar coordinate frame (along tangent to the corner arc)
+        const vs_bar = this.v_s * Math.cos(detachAlpha);
+        const vu_bar = -Math.abs(this.v_s) * Math.sin(detachAlpha); // downward along the curve
+
+        // Convert relative bar velocity to world space
+        const vx_rel = vs_bar * cosTilt + vu_bar * sinTilt;
+        const vy_rel = vs_bar * sinTilt - vu_bar * cosTilt;
+
+        // Rotational velocity component from bar angular speed: v_rot = omega x r
+        const vx_rot = -this.s * barAngularVel * sinTilt + u * barAngularVel * cosTilt;
+        const vy_rot = this.s * barAngularVel * cosTilt + u * barAngularVel * sinTilt;
+
+        this.velX = vx_rel + vx_rot;
+        this.velY = vy_rel + vy_rot;
+
+        // Fade shadow off completely in air
         this.dropShadow.setAlpha(0);
       }
       return;
