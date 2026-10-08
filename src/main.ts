@@ -1,3 +1,4 @@
+import { BackgroundScene } from './scenes/BackgroundScene';
 import { TitleScene } from './scenes/TitleScene';
 import { MainScene } from './scenes/MainScene';
 
@@ -20,7 +21,7 @@ const config: Phaser.Types.Core.GameConfig = {
   input: {
     activePointers: 3,
   },
-  scene: [TitleScene, MainScene],
+  scene: [BackgroundScene, TitleScene, MainScene],
 };
 
 export const game = new Phaser.Game(config);

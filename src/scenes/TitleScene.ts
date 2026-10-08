@@ -5,17 +5,6 @@ import Phaser from 'phaser';
  * Adjust these parameters to fine-tune the visuals, animation speeds, and layout.
  */
 export const TITLE_CONFIG = {
-  // Pastel Gradient Animation
-  gradientScrollSpeed: 40, // Pixels per second diffuse pastel gradient travels upward
-  gradientColors: [
-    { r: 253, g: 243, b: 219 }, // Soft Cream / Buttercup
-    { r: 250, g: 212, b: 192 }, // Pastel Peach / Apricot
-    { r: 244, g: 206, b: 216 }, // Soft Rose / Blush
-    { r: 226, g: 214, b: 237 }, // Pale Lavender
-    { r: 214, g: 230, b: 245 }, // Misty Sky Blue
-    { r: 222, g: 240, b: 226 }, // Pale Mint / Sage
-  ],
-
   // Flat Title Position & Typography
   titleY: 330, // Vertical center of the title block
   titleFontSize: '82px', // Larger, bolder font size
@@ -45,9 +34,6 @@ export const TITLE_CONFIG = {
 };
 
 export class TitleScene extends Phaser.Scene {
-  // Background gradient tile sprite
-  private bgTileSprite!: Phaser.GameObjects.TileSprite;
-
   // Screen Content Containers for sliding transitions
   private mainContainer!: Phaser.GameObjects.Container;
   private optionsContainer!: Phaser.GameObjects.Container;
@@ -60,68 +46,21 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
-    const { width, height } = this.scale;
+    const { width } = this.scale;
     this.isTransitioning = false;
 
-    // 1. Moving Pastel Gradient Background
-    this.createPastelGradientBackground(width, height);
+    // Ensure persistent BackgroundScene is running behind TitleScene
+    if (!this.scene.isActive('BackgroundScene')) {
+      this.scene.launch('BackgroundScene');
+      this.scene.sendToBack('BackgroundScene');
+    }
+    this.scene.bringToTop();
 
-    // 2. Main Title Screen Content (Title + Play Button + Options Button)
+    // 1. Main Title Screen Content (Title + Play Button + Options Button)
     this.createMainContent(width);
 
-    // 3. Options Screen Content ("Not yet implemented!" view + Back Button)
+    // 2. Options Screen Content ("Not yet implemented!" view + Back Button)
     this.createOptionsContent(width);
-  }
-
-  private createPastelGradientBackground(width: number, height: number): void {
-    const textureKey = 'diffusePastelGradient';
-    const textureH = 1536;
-
-    // Generate seamless gradient canvas if not already cached
-    if (!this.textures.exists(textureKey)) {
-      const canvas = this.textures.createCanvas(textureKey, 32, textureH);
-      if (canvas) {
-        const ctx = canvas.getContext();
-        const grad = ctx.createLinearGradient(0, 0, 0, textureH);
-
-        // Append the first color at the end for seamless upward looping
-        const colors = [...TITLE_CONFIG.gradientColors, TITLE_CONFIG.gradientColors[0]];
-        colors.forEach((c, idx) => {
-          const stop = idx / (colors.length - 1);
-          grad.addColorStop(stop, `rgb(${c.r}, ${c.g}, ${c.b})`);
-        });
-
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, 0, 32, textureH);
-        canvas.refresh();
-      }
-    }
-
-    // Scrolling TileSprite for upward diffuse transition
-    this.bgTileSprite = this.add.tileSprite(width / 2, height / 2, width, height, textureKey);
-    this.bgTileSprite.setDepth(0);
-
-    // Semi-transparent tactile paper grain overlay
-    const paperOverlay = this.add.graphics();
-    paperOverlay.setDepth(1);
-
-    const seedRandom = (seed: number) => {
-      const x = Math.sin(seed) * 10000;
-      return x - Math.floor(x);
-    };
-
-    let seed = 77;
-    for (let i = 0; i < 700; i++) {
-      const px = seedRandom(seed++) * width;
-      const py = seedRandom(seed++) * height;
-      const isDark = seedRandom(seed++) > 0.5;
-      const color = isDark ? 0x8a7a60 : 0xffffff;
-      const alpha = 0.02 + seedRandom(seed++) * 0.05;
-      const len = 1.5 + seedRandom(seed++) * 3.0;
-
-      paperOverlay.lineStyle(1, color, alpha);
-      paperOverlay.lineBetween(px, py, px + len, py + (seedRandom(seed++) - 0.5) * 1.5);
-    }
   }
 
   private createMainContent(width: number): void {
@@ -334,19 +273,19 @@ export class TitleScene extends Phaser.Scene {
     if (this.isTransitioning) return;
     this.isTransitioning = true;
 
-    // Slide title and buttons upward and off the screen
+    // Slide title and buttons upward completely off the screen
+    // Lowest element is options button (y: 825, height: 74).
+    // Moving mainContainer.y to -1050 ensures all elements are well past the top edge.
+    const exitTargetY = -(TITLE_CONFIG.optionsButtonY + TITLE_CONFIG.buttonHeight + 150);
+
     this.tweens.add({
       targets: this.mainContainer,
-      y: -780,
-      alpha: 0.9,
-      duration: 480,
+      y: exitTargetY,
+      duration: 440,
       ease: 'Cubic.easeIn',
       onComplete: () => {
-        // Transition camera smoothly into MainScene play state
-        this.cameras.main.fadeOut(200, 223, 213, 192);
-        this.time.delayedCall(200, () => {
-          this.scene.start('MainScene', { fromTitle: true });
-        });
+        // Seamlessly transition into MainScene play state over the persistent background
+        this.scene.start('MainScene', { fromTitle: true });
       },
     });
   }
@@ -399,12 +338,5 @@ export class TitleScene extends Phaser.Scene {
         this.isTransitioning = false;
       },
     });
-  }
-
-  update(_time: number, delta: number): void {
-    // Smooth upward travel of the diffuse pastel gradient
-    if (this.bgTileSprite) {
-      this.bgTileSprite.tilePositionY += (TITLE_CONFIG.gradientScrollSpeed * delta) / 1000;
-    }
   }
 }

@@ -79,65 +79,38 @@ export class MainScene extends Phaser.Scene {
     this.leftFilteredY = barCenterY;
     this.rightFilteredY = barCenterY;
 
-    // 1. Minimalist Construction Paper Background
-    this.createConstructionPaperBackground(width, height);
+    // Ensure persistent BackgroundScene is running behind MainScene
+    if (!this.scene.isActive('BackgroundScene')) {
+      this.scene.launch('BackgroundScene');
+      this.scene.sendToBack('BackgroundScene');
+    }
+    this.scene.bringToTop();
 
-    // 2. Wood Grain Bar (rotates around pinned center 0,0 - no visible pivot)
+    // 1. Wood Grain Bar (rotates around pinned center 0,0 - no visible pivot)
     this.barContainer = this.add.container(barCenterX, barCenterY);
     this.barGraphics = this.add.graphics();
     this.drawWoodBar(this.barGraphics, barWidth, BAR_CONFIG.barHeight);
     this.barContainer.add(this.barGraphics);
 
-    // 3. Invisible Outer Touch Zones
+    // 2. Invisible Outer Touch Zones
     this.createTouchZones(width, barCenterY);
 
-    // 4. Global Pointer Movement and Release Handlers
+    // 3. Global Pointer Movement and Release Handlers
     this.setupGlobalPointerListeners();
 
-    // 5. Downward arrival transition when entering from title screen
+    // 4. Downward arrival transition when entering from title screen
+    // Bar glides down into resting position over the persistent animated background
     if (this.fromTitle) {
-      this.cameras.main.fadeIn(350, 223, 213, 192);
-      this.cameras.main.scrollY = -75;
+      this.barContainer.y = barCenterY - 70;
+      this.barContainer.alpha = 0.5;
       this.tweens.add({
-        targets: this.cameras.main,
-        scrollY: 0,
-        duration: 450,
+        targets: this.barContainer,
+        y: barCenterY,
+        alpha: 1.0,
+        duration: 400,
         ease: 'Cubic.easeOut',
       });
     }
-  }
-
-  private createConstructionPaperBackground(width: number, height: number): void {
-    const bg = this.add.graphics();
-
-    // Base construction paper tone
-    bg.fillStyle(BAR_CONFIG.paperColor, 1.0);
-    bg.fillRect(0, 0, width, height);
-
-    // Subtle paper fibers and mottled grain texture (deterministic seed)
-    const seedRandom = (seed: number) => {
-      const x = Math.sin(seed) * 10000;
-      return x - Math.floor(x);
-    };
-
-    let seed = 42;
-    // Faint paper grain flecks & short fibers
-    for (let i = 0; i < 900; i++) {
-      const px = seedRandom(seed++) * width;
-      const py = seedRandom(seed++) * height;
-      const isDark = seedRandom(seed++) > 0.5;
-      const color = isDark ? 0x8a7a60 : 0xfbf6ec;
-      const alpha = 0.03 + seedRandom(seed++) * 0.07;
-      const len = 1.5 + seedRandom(seed++) * 3.5;
-
-      bg.lineStyle(1, color, alpha);
-      bg.lineBetween(px, py, px + len, py + (seedRandom(seed++) - 0.5) * 1.5);
-    }
-
-    // Soft vignette / paper edge darkening
-    const vignette = this.add.graphics();
-    vignette.lineStyle(3, 0x8a7a60, 0.12);
-    vignette.strokeRect(1, 1, width - 2, height - 2);
   }
 
   private drawWoodBar(g: Phaser.GameObjects.Graphics, w: number, h: number): void {
