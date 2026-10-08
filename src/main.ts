@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import { TitleScene } from './scenes/TitleScene';
 import { MainScene } from './scenes/MainScene';
 
 const config: Phaser.Types.Core.GameConfig = {
@@ -20,7 +20,7 @@ const config: Phaser.Types.Core.GameConfig = {
   input: {
     activePointers: 3,
   },
-  scene: [MainScene],
+  scene: [TitleScene, MainScene],
 };
 
 export const game = new Phaser.Game(config);

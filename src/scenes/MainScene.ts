@@ -58,8 +58,14 @@ export class MainScene extends Phaser.Scene {
   private targetAngleRad: number = 0;
   private angularVelocity: number = 0;
 
+  private fromTitle: boolean = false;
+
   constructor() {
     super('MainScene');
+  }
+
+  init(data?: { fromTitle?: boolean }): void {
+    this.fromTitle = data?.fromTitle ?? false;
   }
 
   create(): void {
@@ -87,6 +93,18 @@ export class MainScene extends Phaser.Scene {
 
     // 4. Global Pointer Movement and Release Handlers
     this.setupGlobalPointerListeners();
+
+    // 5. Downward arrival transition when entering from title screen
+    if (this.fromTitle) {
+      this.cameras.main.fadeIn(350, 223, 213, 192);
+      this.cameras.main.scrollY = -75;
+      this.tweens.add({
+        targets: this.cameras.main,
+        scrollY: 0,
+        duration: 450,
+        ease: 'Cubic.easeOut',
+      });
+    }
   }
 
   private createConstructionPaperBackground(width: number, height: number): void {
