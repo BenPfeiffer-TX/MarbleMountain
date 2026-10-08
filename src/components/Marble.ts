@@ -204,6 +204,7 @@ export class Marble extends Phaser.GameObjects.Container {
     dt: number,
     barX: number,
     barY: number,
+    barRestY: number,
     barAngle: number,
     barAngularVel: number,
     barHalfWidth: number,
@@ -220,6 +221,13 @@ export class Marble extends Phaser.GameObjects.Container {
       const dPerp = barHeight / 2 + r;
       this.x = barX + dPerp * Math.sin(barAngle);
       this.y = barY - dPerp * Math.cos(barAngle);
+
+      // As bar begins decelerating into resting position, the marble's upward momentum
+      // carries it into the air in a continuous fluid motion while the bar halts underneath it
+      if (barY <= barRestY + 32) {
+        this.marbleState = MarbleState.ARRIVAL_LIFT;
+        this.v_h = MARBLE_CONFIG.arrivalLiftSpeed;
+      }
       return;
     }
 

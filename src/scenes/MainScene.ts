@@ -137,16 +137,12 @@ export class MainScene extends Phaser.Scene {
       const offscreenBottomY = height + BAR_CONFIG.barHeight + 60;
       this.barContainer.y = offscreenBottomY;
 
-      // Bar and centered marble slide UP together into resting position
+      // Bar slides UP into resting position; marble momentum lifts it upward continuously as bar brakes
       this.tweens.add({
         targets: this.barContainer,
         y: barCenterY,
         duration: 440,
         ease: 'Cubic.easeOut',
-        onComplete: () => {
-          // When bar comes to rest, ball lifts up with inertia and bounces once before settling
-          this.marble.startArrivalLift();
-        },
       });
     } else {
       this.marble.resetToCenter(barCenterX, barCenterY, 0, BAR_CONFIG.barHeight);
@@ -331,6 +327,7 @@ export class MainScene extends Phaser.Scene {
       dt,
       this.barContainer.x,
       this.barContainer.y,
+      barCenterY,
       this.currentAngleRad,
       this.angularVelocity,
       halfW,

@@ -60,11 +60,12 @@ $$a_{\text{drag}} = -v_s \cdot D_{\text{roll}} \quad (D_{\text{roll}} = 0.30)$$
 ---
 
 ## 5. Arrival Sequence (Entry from Title Screen)
-1. **Entering State**: Bar slides UP from $Y = 1362\text{px}$ to $Y = 1132.8\text{px}$ over $440\text{ms}$ (`Cubic.easeOut`). The marble rides directly on top at $s = 0$.
-2. **Inertia Lift-Off**: The instant the bar reaches $1132.8\text{px}$ and stops, the marble continues upward with inertia:
-   $$v_h = 280\text{px/s} \implies h_{\text{apex}} = \frac{v_h^2}{2g} = \frac{280^2}{2800} = 28\text{px}$$
-3. **Small Bounce**:
-   - Rebound velocity on first contact: $v_{\text{bounce}} = 280 \times 0.38 \approx 106\text{px/s}$ ($h_{\text{rebound}} \approx 5\text{px}-6\text{px}$).
+1. **Entering State & Upward Travel**: The bar and marble slide UP together from $Y = 1362\text{px}$ toward $Y = 1132.8\text{px}$ ($440\text{ms}$, `Cubic.easeOut`).
+2. **Continuous Inertia Lift-Off**: As the bar begins braking near its resting position ($Y_{\text{bar}} \le Y_{\text{rest}} + 32\text{px}$), the marble **does not wait or stop**; its upward vertical momentum naturally carries it into the air ($v_h = 280\text{px/s}$) in one unbroken, fluid upward trajectory.
+3. **Bar Halts Underneath**: While the marble continues soaring upward to its apex ($h_{\text{apex}} \approx 26\text{px}-28\text{px}$), the bar decelerates to a complete stop at $1132.8\text{px}$ underneath it.
+4. **Descent & Tactile Bounce**:
+   - Gravity pulls the marble down onto the now stationary bar.
+   - Rebound velocity on first contact: $v_{\text{bounce}} \approx 106\text{px/s}$ ($h_{\text{rebound}} \approx 5\text{px}-6\text{px}$).
    - On second contact, the marble settles ($h = 0, v_h = 0$) and transitions to active rolling.
 
 ---
