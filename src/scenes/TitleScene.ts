@@ -16,26 +16,20 @@ export const TITLE_CONFIG = {
     { r: 222, g: 240, b: 226 }, // Pale Mint / Sage
   ],
 
-  // Exaggerated Tilted Signboard Dimensions (/___\ Shape)
-  titleY: 330, // Vertical center of the tilted sign
-  signTopWidth: 400, // Top width (narrower for perspective)
-  signBottomWidth: 570, // Bottom width (wider for perspective)
-  signHeight: 180, // Height of the sign slab
-  signBgColor: 0x8c5b33, // Rich warm wood signboard
-  signBorderColor: 0x4a2c14, // Dark wooden border
-  signRivetColor: 0xd4a373, // Bronze mounting corner rivets
-
-  // Title Typography (Thick, Chunky, Snug Spacing)
-  titleMarbleY: -28, // Closer vertical line spacing
-  titleMountainY: 30, // Closer vertical line spacing
-  titleMarbleFontSize: '58px',
-  titleMountainFontSize: '70px',
-  titleMarbleScaleX: 0.82, // Narrower at top of sign
-  titleMountainScaleX: 1.15, // Wider at base of sign
-  titleTextColor: '#fdf6e7', // Light embossed cream lettering
-  titleStrokeColor: '#2b1a0d', // Dark wood engraved stroke
-  titleStrokeThickness: 5, // Extra thick font weight
-  titleShadowColor: '#1a0e05', // Deep 3D drop shadow
+  // 3D Title Position & Underside Perspective (/ \ Tilt)
+  titleY: 330, // Vertical center of the 3D title
+  titleMarbleY: -28, // 'Marble' vertical position
+  titleMountainY: 26, // 'Mountain' vertical position (closer line spacing: 54px apart)
+  titleMarbleFontSize: '62px',
+  titleMountainFontSize: '74px',
+  titleMarbleScaleX: 0.82, // Narrower at top (/ \)
+  titleMountainScaleX: 1.16, // Wider at base (/ \)
+  titleExtrusionDepth: 12, // Number of stacked underside shadow layers for deep 3D relief
+  titleTextColor: '#3d2516', // Front face rich warm wood / earth tone
+  titleStrokeColor: '#24140b', // Front face dark contour stroke
+  titleStrokeThickness: 4, // Extra thick chunky weight
+  titleUndersideDark: '#120904', // Deepest underside shadow
+  titleUndersideMid: '#241308', // Mid underside extrusion tone
 
   // Tactile Wood Squircle Buttons (Deep 3D Press & Shading)
   buttonWidth: 290,
@@ -140,8 +134,8 @@ export class TitleScene extends Phaser.Scene {
     this.mainContainer = this.add.container(0, 0);
     this.mainContainer.setDepth(10);
 
-    // 1. Tilted Perspective Trapezoid Sign Title (/___\ shape)
-    const titleContainer = this.createTiltedTrapezoidTitle(width);
+    // 1. Tilted 3D Extruded Title (/___\ perspective without signboard)
+    const titleContainer = this.createTilted3DTitle(width);
     this.mainContainer.add(titleContainer);
 
     // 2. Tactile 3D Wood Squircle 'Play' Button
@@ -163,139 +157,88 @@ export class TitleScene extends Phaser.Scene {
     this.mainContainer.add(optionsButton);
   }
 
-  private createTiltedTrapezoidTitle(width: number): Phaser.GameObjects.Container {
+  private createTilted3DTitle(width: number): Phaser.GameObjects.Container {
     const container = this.add.container(width / 2, TITLE_CONFIG.titleY);
-
-    const topW = TITLE_CONFIG.signTopWidth;
-    const botW = TITLE_CONFIG.signBottomWidth;
-    const h = TITLE_CONFIG.signHeight;
-    const halfH = h / 2;
-
-    const g = this.add.graphics();
-
-    // 1. Drop shadow beneath the trapezoid (offset down by 10px)
-    g.fillStyle(0x2a1d13, 0.28);
-    g.beginPath();
-    g.moveTo(-topW / 2, -halfH + 10);
-    g.lineTo(topW / 2, -halfH + 10);
-    g.lineTo(botW / 2, halfH + 10);
-    g.lineTo(-botW / 2, halfH + 10);
-    g.closePath();
-    g.fillPath();
-
-    // 2. Extruded bottom edge for 3D slab thickness
-    g.fillStyle(0x3a210d, 0.95);
-    g.beginPath();
-    g.moveTo(-botW / 2, halfH);
-    g.lineTo(botW / 2, halfH);
-    g.lineTo(botW / 2, halfH + 6);
-    g.lineTo(-botW / 2, halfH + 6);
-    g.closePath();
-    g.fillPath();
-
-    // 3. Main Trapezoid Wooden Sign Face (/   \ shape)
-    g.fillStyle(TITLE_CONFIG.signBgColor, 1.0);
-    g.beginPath();
-    g.moveTo(-topW / 2, -halfH);
-    g.lineTo(topW / 2, -halfH);
-    g.lineTo(botW / 2, halfH);
-    g.lineTo(-botW / 2, halfH);
-    g.closePath();
-    g.fillPath();
-
-    // 4. Subtle wood grain horizontal fibers across the trapezoid
-    g.lineStyle(1.5, 0x6e4321, 0.35);
-    for (let yOffset = -halfH + 18; yOffset < halfH; yOffset += 24) {
-      // Line length interpolated between topW and botW
-      const t = (yOffset + halfH) / h;
-      const currentW = (topW + (botW - topW) * t) * 0.92;
-      g.lineBetween(-currentW / 2, yOffset, currentW / 2, yOffset);
-    }
-
-    // 5. Heavy Outer Wooden Frame Stroke (/   \)
-    g.lineStyle(4, TITLE_CONFIG.signBorderColor, 1.0);
-    g.beginPath();
-    g.moveTo(-topW / 2, -halfH);
-    g.lineTo(topW / 2, -halfH);
-    g.lineTo(botW / 2, halfH);
-    g.lineTo(-botW / 2, halfH);
-    g.closePath();
-    g.strokePath();
-
-    // 6. Corner Bronze Mounting Rivets
-    const drawRivet = (rx: number, ry: number) => {
-      g.fillStyle(0x2a1d13, 0.5);
-      g.fillCircle(rx, ry + 2, 6);
-      g.fillStyle(TITLE_CONFIG.signRivetColor, 1.0);
-      g.fillCircle(rx, ry, 5);
-      g.fillStyle(0xffffff, 0.7);
-      g.fillCircle(rx - 1.5, ry - 1.5, 1.5);
-    };
-    drawRivet(-topW / 2 + 18, -halfH + 16);
-    drawRivet(topW / 2 - 18, -halfH + 16);
-    drawRivet(-botW / 2 + 20, halfH - 16);
-    drawRivet(botW / 2 - 20, halfH - 16);
-
-    container.add(g);
-
-    // 7. Typography (Thick, Chunky, Tightly Spaced)
     const fontStack = '"Quicksand", "Nunito", "ui-rounded", -apple-system, BlinkMacSystemFont, sans-serif';
 
-    // 'Marble' 3D Shadow
-    const marbleShadow = this.add.text(0, TITLE_CONFIG.titleMarbleY + 4, 'Marble', {
-      fontFamily: fontStack,
-      fontSize: TITLE_CONFIG.titleMarbleFontSize,
-      fontStyle: '900',
-      color: TITLE_CONFIG.titleShadowColor,
-      align: 'center',
-      stroke: TITLE_CONFIG.titleShadowColor,
-      strokeThickness: TITLE_CONFIG.titleStrokeThickness,
-    });
-    marbleShadow.setOrigin(0.5);
-    marbleShadow.setScale(TITLE_CONFIG.titleMarbleScaleX, 0.85);
-    marbleShadow.setAlpha(0.45);
+    // Renders chunky 3D text with deep underside shadows viewed from below
+    const render3DWord = (
+      word: string,
+      y: number,
+      fontSize: string,
+      scaleX: number,
+      scaleY: number
+    ) => {
+      const depth = TITLE_CONFIG.titleExtrusionDepth;
 
-    // 'Marble' Main Text (Narrower at top)
-    const marbleText = this.add.text(0, TITLE_CONFIG.titleMarbleY, 'Marble', {
-      fontFamily: fontStack,
-      fontSize: TITLE_CONFIG.titleMarbleFontSize,
-      fontStyle: '900',
-      color: TITLE_CONFIG.titleTextColor,
-      align: 'center',
-      stroke: TITLE_CONFIG.titleStrokeColor,
-      strokeThickness: TITLE_CONFIG.titleStrokeThickness,
-    });
-    marbleText.setOrigin(0.5);
-    marbleText.setScale(TITLE_CONFIG.titleMarbleScaleX, 0.85);
+      // 1. Soft contact ground shadow cast underneath
+      const groundShadow = this.add.text(0, y + depth + 6, word, {
+        fontFamily: fontStack,
+        fontSize,
+        fontStyle: '900',
+        color: '#1a0e05',
+        align: 'center',
+        stroke: '#1a0e05',
+        strokeThickness: TITLE_CONFIG.titleStrokeThickness + 2,
+      });
+      groundShadow.setOrigin(0.5);
+      groundShadow.setScale(scaleX, scaleY);
+      groundShadow.setAlpha(0.24);
+      container.add(groundShadow);
 
-    // 'Mountain' 3D Shadow
-    const mountainShadow = this.add.text(0, TITLE_CONFIG.titleMountainY + 4, 'Mountain', {
-      fontFamily: fontStack,
-      fontSize: TITLE_CONFIG.titleMountainFontSize,
-      fontStyle: '900',
-      color: TITLE_CONFIG.titleShadowColor,
-      align: 'center',
-      stroke: TITLE_CONFIG.titleShadowColor,
-      strokeThickness: TITLE_CONFIG.titleStrokeThickness,
-    });
-    mountainShadow.setOrigin(0.5);
-    mountainShadow.setScale(TITLE_CONFIG.titleMountainScaleX, 0.88);
-    mountainShadow.setAlpha(0.45);
+      // 2. Extrusion layers simulating the physical thickness & shaded undersides seen from below
+      // Rendered from bottom layer (deepest underside) up to top
+      for (let i = depth; i >= 1; i--) {
+        const t = i / depth;
+        // Deep underside gradient from dark base to upper bevel
+        const shade = t > 0.5 ? TITLE_CONFIG.titleUndersideDark : TITLE_CONFIG.titleUndersideMid;
 
-    // 'Mountain' Main Text (Wider at bottom)
-    const mountainText = this.add.text(0, TITLE_CONFIG.titleMountainY, 'Mountain', {
-      fontFamily: fontStack,
-      fontSize: TITLE_CONFIG.titleMountainFontSize,
-      fontStyle: '900',
-      color: TITLE_CONFIG.titleTextColor,
-      align: 'center',
-      stroke: TITLE_CONFIG.titleStrokeColor,
-      strokeThickness: TITLE_CONFIG.titleStrokeThickness,
-    });
-    mountainText.setOrigin(0.5);
-    mountainText.setScale(TITLE_CONFIG.titleMountainScaleX, 0.88);
+        const slice = this.add.text(0, y + i * 1.2, word, {
+          fontFamily: fontStack,
+          fontSize,
+          fontStyle: '900',
+          color: shade,
+          align: 'center',
+          stroke: shade,
+          strokeThickness: TITLE_CONFIG.titleStrokeThickness,
+        });
+        slice.setOrigin(0.5);
+        slice.setScale(scaleX, scaleY);
+        container.add(slice);
+      }
 
-    container.add([marbleShadow, marbleText, mountainShadow, mountainText]);
+      // 3. Front Face of the 3D letter block
+      const frontFace = this.add.text(0, y, word, {
+        fontFamily: fontStack,
+        fontSize,
+        fontStyle: '900',
+        color: TITLE_CONFIG.titleTextColor,
+        align: 'center',
+        stroke: TITLE_CONFIG.titleStrokeColor,
+        strokeThickness: TITLE_CONFIG.titleStrokeThickness,
+      });
+      frontFace.setOrigin(0.5);
+      frontFace.setScale(scaleX, scaleY);
+      container.add(frontFace);
+    };
+
+    // Render 'Marble' (narrower at top) and 'Mountain' (wider at base)
+    // Closely spaced lines for unified 3D block appearance
+    render3DWord(
+      'Marble',
+      TITLE_CONFIG.titleMarbleY,
+      TITLE_CONFIG.titleMarbleFontSize,
+      TITLE_CONFIG.titleMarbleScaleX,
+      0.82
+    );
+
+    render3DWord(
+      'Mountain',
+      TITLE_CONFIG.titleMountainY,
+      TITLE_CONFIG.titleMountainFontSize,
+      TITLE_CONFIG.titleMountainScaleX,
+      0.86
+    );
 
     return container;
   }
