@@ -98,16 +98,15 @@ export class MainScene extends Phaser.Scene {
     // 3. Global Pointer Movement and Release Handlers
     this.setupGlobalPointerListeners();
 
-    // 4. Downward arrival transition when entering from title screen
-    // Bar glides down into resting position over the persistent animated background
+    // 4. Upward arrival transition when entering from title screen
+    // Bar starts completely off-screen below the bottom edge and slides UP into resting position
     if (this.fromTitle) {
-      this.barContainer.y = barCenterY - 70;
-      this.barContainer.alpha = 0.5;
+      const offscreenBottomY = height + BAR_CONFIG.barHeight + 60;
+      this.barContainer.y = offscreenBottomY;
       this.tweens.add({
         targets: this.barContainer,
         y: barCenterY,
-        alpha: 1.0,
-        duration: 400,
+        duration: 440,
         ease: 'Cubic.easeOut',
       });
     }
