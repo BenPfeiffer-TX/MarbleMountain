@@ -25,15 +25,18 @@ This document records the exact parameters, physics models, visual styling, and 
 
 ---
 
-## 3. Reflective Metallic Steel Visuals
-- **Spherical Shading**: Radial gradient with off-center specular core positioned at $(-0.32 R, -0.32 R)$:
-  - Center/Core: Pure white glare (`#ffffff`).
-  - Mid-tone: Bright polished silver (`#e6ebed` $\rightarrow$ `#a6b2ba`).
-  - Underside Shadow: Deep steel gray (`#6d7780` $\rightarrow$ `#3e454d`).
-  - Outer Edge: Dark rim contour shadow (`#262a2e`).
-- **Rotation Indication (Rolling vs Sliding)**:
-  - The sphere includes subtle latitudinal equator seams and brushed steel texture that physically rotate with $\Delta \phi = \Delta s / R$.
-  - The specular glare overlay remains stationary relative to the top-left light source, clearly proving to the player that the ball is physically rolling without sliding.
+## 3. Reflective Shiny Steel Ball Bearing Visuals
+- **Authentic Polished Bearing Design**:
+  - The marble renders as a clean, mirror-polished chrome steel ball bearing.
+  - Artificial visual aids (circumference lines, equator seams, surface grain arcs, and separate lighting overlays) have been completely removed.
+- **Spherical Specular Shading**:
+  - Blinding hot-white specular core (`#ffffff`) centered at $(-0.32 R, -0.32 R)$.
+  - Smooth silver transition (`#f0f5fa` $\rightarrow$ `#d4dee6` $\rightarrow$ `#8e9da8`).
+  - Subtle ambient underside ground reflection (`rgba(215, 230, 245, 0.24)`) on the lower crescent.
+  - Crisp outer steel contour rim (`#1c2024`).
+- **Decoupled Texture Architecture**:
+  - The ball bearing texture and contact drop shadow are generated and managed by [`src/themes/defaultTheme.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/themes/defaultTheme.ts) and [`src/themes/themeManager.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/themes/themeManager.ts).
+  - Clean separation allows the marble appearance to be themed or swapped seamlessly.
 
 ---
 
@@ -94,3 +97,22 @@ $$a_{\text{drag}} = -v_s \cdot D_{\text{roll}} \quad (D_{\text{roll}} = 0.30)$$
 - **Highscore Chart**:
   - Blank list with columns ('Highscore', 'Score', 'Time').
   - Soft semi-transparent grey vertical divider lines (`0x888888`, $\alpha = 0.22$) between columns; no outer borders.
+
+---
+
+## 7. Centralized Theme Architecture & Skinning
+To support simultaneously changing visual themes (e.g., from classic wood to glowing neon or retro chrome) in a future feature without cluttering gameplay logic:
+
+1. **Theme Contracts** ([`src/themes/types.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/themes/types.ts)):
+   - `MarbleTheme`: Texture generation (`ensureTexture`) and drop shadow rendering (`drawShadow`), with an optional `rotatesTexture` flag.
+   - `BarTheme`: Bar surface and bevel rendering (`drawBar`).
+   - `ButtonTheme`: Base extrusion (`drawBase`), movable face plate (`drawFace`), dark press shading (`drawPressShade`), font stack, and text colors.
+   - `GameTheme`: Aggregates `MarbleTheme`, `BarTheme`, and `ButtonTheme`.
+2. **Central Theme Manager** ([`src/themes/themeManager.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/themes/themeManager.ts)):
+   - Singleton registry holding active theme and registered themes.
+   - Reactive pub-sub listener (`onThemeChanged`) notifying game elements of runtime theme swaps.
+3. **Unified Tactile Button** ([`src/ui/TactileButton.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/ui/TactileButton.ts)):
+   - Central button factory consumed across all screens ([`TitleScene.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/scenes/TitleScene.ts) and [`GameOverModal.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/ui/GameOverModal.ts)).
+   - Automatically adopts active theme aesthetics and updates dynamically upon theme changes.
+4. **Player-Facing UI Constraint**:
+   - As specified, no player-facing settings or options UI are exposed at this stage. The architecture strictly provides the foundation for future theme packs.

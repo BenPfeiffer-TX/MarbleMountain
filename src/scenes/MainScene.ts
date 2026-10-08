@@ -3,6 +3,7 @@ import { Marble } from '../components/Marble';
 import { GameOverModal } from '../ui/GameOverModal';
 import { MARBLE_CONFIG } from '../config/marbleConfig';
 import { BackgroundScene } from './BackgroundScene';
+import { ThemeManager } from '../themes/themeManager';
 
 /**
  * TUNABLE GAMEPLAY & VISUAL CONFIGURATION
@@ -52,6 +53,7 @@ export class MainScene extends Phaser.Scene {
   // Game Over Modal UI
   private gameOverModal!: GameOverModal;
   private isGameOverActive: boolean = false;
+  private unsubscribeTheme?: () => void;
 
   // Touch zones (invisible hit areas)
   private leftZone!: Phaser.GameObjects.Zone;
@@ -147,39 +149,24 @@ export class MainScene extends Phaser.Scene {
     } else {
       this.marble.resetToCenter(barCenterX, barCenterY, 0, BAR_CONFIG.barHeight);
     }
+
+    // Subscribe to dynamic theme switches for the bar
+    this.unsubscribeTheme = ThemeManager.onThemeChanged((theme) => {
+      if (this.barGraphics) {
+        const currentBarWidth = this.scale.width * BAR_CONFIG.barWidthRatio;
+        theme.bar.drawBar(this.barGraphics, currentBarWidth, BAR_CONFIG.barHeight, BAR_CONFIG.barCornerRadius);
+      }
+    });
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.unsubscribeTheme) {
+        this.unsubscribeTheme();
+      }
+    });
   }
 
   private drawWoodBar(g: Phaser.GameObjects.Graphics, w: number, h: number): void {
-    g.clear();
-    const halfW = w / 2;
-    const halfH = h / 2;
-    const r = BAR_CONFIG.barCornerRadius;
-
-    // Soft contact drop shadow beneath bar
-    g.fillStyle(0x3a2c1d, 0.26);
-    g.fillRoundedRect(-halfW, -halfH + 5, w, h, r);
-
-    // Wood base rounded rectangle
-    g.fillStyle(BAR_CONFIG.woodBaseColor, 1.0);
-    g.fillRoundedRect(-halfW, -halfH, w, h, r);
-
-    // Subtle wood grain lines along the length
-    const grainLines = [
-      { yOffset: -halfH + 3.5, color: BAR_CONFIG.woodGrainLightColor, alpha: 0.35, width: 2 },
-      { yOffset: -halfH + 7.5, color: BAR_CONFIG.woodGrainDarkColor, alpha: 0.25, width: 1.5 },
-      { yOffset: -halfH + 11.5, color: BAR_CONFIG.woodGrainLightColor, alpha: 0.20, width: 1 },
-      { yOffset: -halfH + 15.5, color: BAR_CONFIG.woodGrainDarkColor, alpha: 0.30, width: 2 },
-      { yOffset: -halfH + 18.5, color: BAR_CONFIG.woodGrainLightColor, alpha: 0.25, width: 1.5 },
-    ];
-
-    grainLines.forEach((grain) => {
-      g.lineStyle(grain.width, grain.color, grain.alpha);
-      g.lineBetween(-halfW + 6, grain.yOffset, halfW - 6, grain.yOffset);
-    });
-
-    // Soft perimeter edge shadow to give the wood bar tactile depth
-    g.lineStyle(1.5, BAR_CONFIG.woodGrainDarkColor, 0.45);
-    g.strokeRoundedRect(-halfW, -halfH, w, h, r);
+    ThemeManager.getActiveTheme().bar.drawBar(g, w, h, BAR_CONFIG.barCornerRadius);
   }
 
   private createTouchZones(width: number, barCenterY: number): void {

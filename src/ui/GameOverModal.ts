@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { MARBLE_CONFIG } from '../config/marbleConfig';
+import { createTactileButton } from './TactileButton';
 
 /**
  * GAME OVER MODAL COMPONENT
@@ -110,11 +111,12 @@ export class GameOverModal extends Phaser.GameObjects.Container {
     const leftBtnX = -btnW / 2 - gap / 2;
     const rightBtnX = btnW / 2 + gap / 2;
 
-    const tryAgainBtn = this.createTactileWoodButton({
+    const tryAgainBtn = createTactileButton(this.scene, {
       x: leftBtnX,
       y: btnY,
       w: btnW,
       h: btnH,
+      radius: MARBLE_CONFIG.buttonRadius,
       label: 'Try Again',
       fontSize: '22px',
       onPointerDown: () => {
@@ -123,11 +125,12 @@ export class GameOverModal extends Phaser.GameObjects.Container {
     });
     this.cardContainer.add(tryAgainBtn);
 
-    const mainMenuBtn = this.createTactileWoodButton({
+    const mainMenuBtn = createTactileButton(this.scene, {
       x: rightBtnX,
       y: btnY,
       w: btnW,
       h: btnH,
+      radius: MARBLE_CONFIG.buttonRadius,
       label: 'Main Menu',
       fontSize: '22px',
       onPointerDown: () => {
@@ -235,123 +238,6 @@ export class GameOverModal extends Phaser.GameObjects.Container {
       timeDash.setOrigin(0.5);
       this.cardContainer.add(timeDash);
     }
-  }
-
-  /**
-   * Creates a tactile 3D wood squircle button following the home screen design language:
-   * Base extrusion bevel + movable top face plate that sinks 6px and darkens when pressed,
-   * then springs up with punchy Back.easeOut recoil before firing action.
-   */
-  private createTactileWoodButton(config: {
-    x: number;
-    y: number;
-    w: number;
-    h: number;
-    label: string;
-    fontSize: string;
-    onPointerDown: () => void;
-  }): Phaser.GameObjects.Container {
-    const w = config.w;
-    const h = config.h;
-    const r = MARBLE_CONFIG.buttonRadius;
-    const fontStack = '"Quicksand", "Nunito", "ui-rounded", -apple-system, BlinkMacSystemFont, sans-serif';
-
-    const btnContainer = this.scene.add.container(config.x, config.y);
-
-    // 1. Stationary Base & Shadow (shows physical wood block depth underneath)
-    const baseG = this.scene.add.graphics();
-    baseG.fillStyle(0x3a2c1d, 0.28);
-    baseG.fillRoundedRect(-w / 2, -h / 2 + 7, w, h, r);
-    // Dark bottom wood bevel / thickness (extrusion)
-    baseG.fillStyle(0x5a3617, 1.0);
-    baseG.fillRoundedRect(-w / 2, -h / 2 + 4, w, h, r);
-    btnContainer.add(baseG);
-
-    // 2. Movable Top Face Container (sinks down 6px when pressed, springs up on release)
-    const faceContainer = this.scene.add.container(0, -6);
-
-    const faceG = this.scene.add.graphics();
-    // Base wood face
-    faceG.fillStyle(0x9c6638, 1.0);
-    faceG.fillRoundedRect(-w / 2, -h / 2, w, h, r);
-
-    // Wood grain lines
-    const grainOffsets = [
-      { y: -h / 2 + 12, col: 0xb57c4c, alpha: 0.35, width: 2 },
-      { y: -h / 2 + 24, col: 0x7c4e27, alpha: 0.28, width: 1.5 },
-      { y: -h / 2 + 38, col: 0xb57c4c, alpha: 0.25, width: 1.5 },
-      { y: -h / 2 + 50, col: 0x7c4e27, alpha: 0.30, width: 2 },
-    ];
-    grainOffsets.forEach((g) => {
-      faceG.lineStyle(g.width, g.col, g.alpha);
-      faceG.lineBetween(-w / 2 + 8, g.y, w / 2 - 8, g.y);
-    });
-
-    // Dark contour stroke
-    faceG.lineStyle(1.5, 0x5a3617, 0.45);
-    faceG.strokeRoundedRect(-w / 2, -h / 2, w, h, r);
-    faceContainer.add(faceG);
-
-    // Button label
-    const label = this.scene.add.text(0, 0, config.label, {
-      fontFamily: fontStack,
-      fontSize: config.fontSize,
-      fontStyle: '700',
-      color: '#fdf6e7', // Light beige color
-      align: 'center',
-    });
-    label.setOrigin(0.5);
-    faceContainer.add(label);
-
-    // Dark press shading overlay (0 -> 1 on pointer down)
-    const shadeOverlay = this.scene.add.graphics();
-    shadeOverlay.fillStyle(0x180b04, 0.35);
-    shadeOverlay.fillRoundedRect(-w / 2, -h / 2, w, h, r);
-    shadeOverlay.setAlpha(0);
-    faceContainer.add(shadeOverlay);
-
-    btnContainer.add(faceContainer);
-
-    // 3. Dedicated Interactive Touch Zone at local (0, 0)
-    const zone = this.scene.add.zone(0, 0, w + 24, h + 24);
-    zone.setInteractive({ useHandCursor: true });
-    btnContainer.add(zone);
-
-    let isPressed = false;
-    zone.on('pointerdown', () => {
-      if (isPressed) return;
-      isPressed = true;
-
-      // 1. Instantly sink 6px down and darken
-      faceContainer.y = 0;
-      shadeOverlay.setAlpha(1);
-
-      // 2. Spring up with punchy recoil and fire action
-      this.scene.time.delayedCall(80, () => {
-        this.scene.tweens.add({
-          targets: faceContainer,
-          y: -6,
-          duration: 100,
-          ease: 'Back.easeOut',
-          onComplete: () => {
-            shadeOverlay.setAlpha(0);
-            isPressed = false;
-            config.onPointerDown();
-          },
-        });
-      });
-    });
-
-    const resetState = () => {
-      if (!isPressed) {
-        faceContainer.y = -6;
-        shadeOverlay.setAlpha(0);
-      }
-    };
-    zone.on('pointerout', resetState);
-    zone.on('pointercancel', resetState);
-
-    return btnContainer;
   }
 
   public show(onTryAgain: () => void, onMainMenu: () => void): void {

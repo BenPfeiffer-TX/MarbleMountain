@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { MARBLE_CONFIG } from '../config/marbleConfig';
+import { ThemeManager } from '../themes/themeManager';
+import { MarbleTheme } from '../themes/types';
 
 export enum MarbleState {
   ENTERING = 'ENTERING',
@@ -11,14 +13,13 @@ export enum MarbleState {
 }
 
 /**
- * METALLIC STEEL MARBLE COMPONENT
+ * SHINY METALLIC BALL BEARING MARBLE COMPONENT
  *
  * Implements:
- * 1. Reflective chrome/steel visual appearance with rotating brushed steel surface
- *    and stationary specular highlight to clearly convey rolling without sliding.
+ * 1. Clean, shiny metallic steel ball bearing visual appearance decoupled via ThemeManager.
  * 2. Pure rolling physics along the mechanical tilting bar (no sliding, inertia + friction).
- * 3. Arrival lift-off and bounce sequence when entering the scene.
- * 4. Departure and free-fall projectile physics when rolling off the bar tips.
+ * 3. Kinetic arrival lift-off and bounce sequence when entering the scene.
+ * 4. Free-fall projectile physics when rolling off the bar tips.
  */
 export class Marble extends Phaser.GameObjects.Container {
   private marbleState: MarbleState = MarbleState.ENTERING;
@@ -40,124 +41,61 @@ export class Marble extends Phaser.GameObjects.Container {
 
   // Visual sub-elements
   private dropShadow!: Phaser.GameObjects.Graphics;
-  private rotatingBodyContainer!: Phaser.GameObjects.Container;
-  private fixedSpecularHighlight!: Phaser.GameObjects.Graphics;
+  private marbleSprite!: Phaser.GameObjects.Image;
+  private unsubscribeTheme?: () => void;
 
   private onGameOverCallback?: () => void;
-
-  private static readonly TEXTURE_KEY = 'metallicSteelMarbleBody';
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
 
-    this.ensureMarbleTextures();
     this.createVisualElements();
 
     scene.add.existing(this);
     this.setDepth(15);
-  }
 
-  /**
-   * Generates high-res reflective metallic steel sphere canvas texture.
-   */
-  private ensureMarbleTextures(): void {
-    const key = Marble.TEXTURE_KEY;
-    if (this.scene.textures.exists(key)) return;
+    // Subscribe to dynamic theme switches
+    this.unsubscribeTheme = ThemeManager.onThemeChanged((theme) => {
+      this.applyTheme(theme.marble);
+    });
 
-    const r = MARBLE_CONFIG.radius;
-    const size = r * 2 + 4;
-    const canvas = this.scene.textures.createCanvas(key, size, size);
-    if (!canvas) return;
-
-    const ctx = canvas.getContext();
-    const cx = size / 2;
-    const cy = size / 2;
-
-    // 1. Dark outer steel rim shadow
-    ctx.beginPath();
-    ctx.arc(cx, cy, r, 0, Math.PI * 2);
-    ctx.fillStyle = '#22272c';
-    ctx.fill();
-
-    // 2. Spherical steel radial gradient
-    // Light source positioned top-left (-0.32r, -0.32r)
-    const grad = ctx.createRadialGradient(
-      cx - r * 0.32,
-      cy - r * 0.32,
-      r * 0.05,
-      cx,
-      cy,
-      r
-    );
-    grad.addColorStop(0.0, '#ffffff'); // Crisp specular core
-    grad.addColorStop(0.18, '#e6ebed'); // Bright silver
-    grad.addColorStop(0.45, '#a6b2ba'); // Mid reflective steel
-    grad.addColorStop(0.72, '#6d7780'); // Shadowed steel tone
-    grad.addColorStop(0.92, '#3e454d'); // Dark steel rim
-    grad.addColorStop(1.0, '#262a2e'); // Contour border
-
-    ctx.beginPath();
-    ctx.arc(cx, cy, r - 0.5, 0, Math.PI * 2);
-    ctx.fillStyle = grad;
-    ctx.fill();
-
-    // 3. Subtle brushed steel surface grain lines (rotates with ball to prove rolling)
-    ctx.save();
-    ctx.beginPath();
-    ctx.arc(cx, cy, r - 1.5, 0, Math.PI * 2);
-    ctx.clip();
-
-    ctx.strokeStyle = 'rgba(255, 255, 255, 0.16)';
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.65, 0.4, 2.7);
-    ctx.stroke();
-
-    ctx.strokeStyle = 'rgba(30, 36, 42, 0.22)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.arc(cx, cy, r * 0.45, 3.4, 5.8);
-    ctx.stroke();
-
-    // Latitudinal polished steel equator seam for visible rotation feedback
-    ctx.strokeStyle = 'rgba(240, 246, 250, 0.28)';
-    ctx.lineWidth = 1.0;
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, r * 0.85, r * 0.25, 0, 0, Math.PI * 2);
-    ctx.stroke();
-
-    ctx.restore();
-    canvas.refresh();
+    this.once(Phaser.GameObjects.Events.DESTROY, () => {
+      if (this.unsubscribeTheme) {
+        this.unsubscribeTheme();
+      }
+    });
   }
 
   private createVisualElements(): void {
     const r = MARBLE_CONFIG.radius;
+    const theme = ThemeManager.getActiveTheme().marble;
 
-    // 1. Drop shadow cast onto the wood bar (or ground)
+    // 1. Soft contact drop shadow beneath marble
     this.dropShadow = this.scene.add.graphics();
-    this.dropShadow.fillStyle(MARBLE_CONFIG.shadowColor, MARBLE_CONFIG.shadowAlpha);
-    this.dropShadow.fillEllipse(0, r + 1, r * 1.5, 6);
+    theme.drawShadow(this.dropShadow, r);
     this.add(this.dropShadow);
 
-    // 2. Rotating Steel Body Container
-    this.rotatingBodyContainer = this.scene.add.container(0, 0);
-    const bodySprite = this.scene.add.image(0, 0, Marble.TEXTURE_KEY);
-    this.rotatingBodyContainer.add(bodySprite);
-    this.add(this.rotatingBodyContainer);
+    // 2. Shiny Metal Ball Bearing Sprite
+    const textureKey = theme.ensureTexture(this.scene.textures, r);
+    this.marbleSprite = this.scene.add.image(0, 0, textureKey);
+    this.add(this.marbleSprite);
+  }
 
-    // 3. Stationary Specular Glare (stays aligned to light source at top-left)
-    this.fixedSpecularHighlight = this.scene.add.graphics();
-    this.fixedSpecularHighlight.fillStyle(0xffffff, 0.75);
-    this.fixedSpecularHighlight.fillEllipse(-r * 0.35, -r * 0.35, r * 0.45, r * 0.3);
-    this.fixedSpecularHighlight.fillStyle(0xffffff, 0.95);
-    this.fixedSpecularHighlight.fillCircle(-r * 0.33, -r * 0.33, r * 0.16);
-    // Subtle ambient underside rim reflection
-    this.fixedSpecularHighlight.lineStyle(1.5, 0xc8b69b, 0.25);
-    this.fixedSpecularHighlight.beginPath();
-    this.fixedSpecularHighlight.arc(0, 0, r - 1.5, Math.PI * 0.25, Math.PI * 0.75);
-    this.fixedSpecularHighlight.strokePath();
-
-    this.add(this.fixedSpecularHighlight);
+  /**
+   * Updates visual appearance when a new theme is activated.
+   */
+  public applyTheme(theme: MarbleTheme): void {
+    const r = MARBLE_CONFIG.radius;
+    const key = theme.ensureTexture(this.scene.textures, r);
+    if (this.marbleSprite) {
+      this.marbleSprite.setTexture(key);
+      if (!theme.rotatesTexture) {
+        this.marbleSprite.setRotation(0);
+      }
+    }
+    if (this.dropShadow) {
+      theme.drawShadow(this.dropShadow, r);
+    }
   }
 
   /**
@@ -177,7 +115,11 @@ export class Marble extends Phaser.GameObjects.Container {
     this.h = 0;
     this.v_h = 0;
     this.rollAngle = 0;
-    this.rotatingBodyContainer.setRotation(0);
+    if (this.marbleSprite) {
+      this.marbleSprite.setRotation(0);
+    }
+    const theme = ThemeManager.getActiveTheme().marble;
+    theme.drawShadow(this.dropShadow, MARBLE_CONFIG.radius);
     this.dropShadow.setAlpha(MARBLE_CONFIG.shadowAlpha);
     this.dropShadow.setScale(1);
 
@@ -300,7 +242,10 @@ export class Marble extends Phaser.GameObjects.Container {
 
       // Pure rolling rotation: distance rolled / radius = rotation in radians
       this.rollAngle += (this.v_s * dt) / r;
-      this.rotatingBodyContainer.setRotation(this.rollAngle);
+      const theme = ThemeManager.getActiveTheme().marble;
+      if (theme.rotatesTexture) {
+        this.marbleSprite.setRotation(this.rollAngle);
+      }
 
       // Calculate world position on the bar surface
       const dPerp = barHeight / 2 + r;
@@ -330,7 +275,10 @@ export class Marble extends Phaser.GameObjects.Container {
       this.worldY += this.velY * dt;
 
       this.rollAngle += (this.v_s / r) * dt;
-      this.rotatingBodyContainer.setRotation(this.rollAngle);
+      const theme = ThemeManager.getActiveTheme().marble;
+      if (theme.rotatesTexture) {
+        this.marbleSprite.setRotation(this.rollAngle);
+      }
 
       this.x = this.worldX;
       this.y = this.worldY;
