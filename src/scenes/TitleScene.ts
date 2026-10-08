@@ -16,20 +16,14 @@ export const TITLE_CONFIG = {
     { r: 222, g: 240, b: 226 }, // Pale Mint / Sage
   ],
 
-  // 3D Title Position & Underside Perspective (/ \ Tilt)
-  titleY: 330, // Vertical center of the 3D title
-  titleMarbleY: -28, // 'Marble' vertical position
-  titleMountainY: 26, // 'Mountain' vertical position (closer line spacing: 54px apart)
-  titleMarbleFontSize: '62px',
-  titleMountainFontSize: '74px',
-  titleMarbleScaleX: 0.82, // Narrower at top (/ \)
-  titleMountainScaleX: 1.16, // Wider at base (/ \)
-  titleExtrusionDepth: 12, // Number of stacked underside shadow layers for deep 3D relief
-  titleTextColor: '#3d2516', // Front face rich warm wood / earth tone
-  titleStrokeColor: '#24140b', // Front face dark contour stroke
-  titleStrokeThickness: 4, // Extra thick chunky weight
-  titleUndersideDark: '#120904', // Deepest underside shadow
-  titleUndersideMid: '#241308', // Mid underside extrusion tone
+  // Flat Title Position & Typography
+  titleY: 330, // Vertical center of the title block
+  titleFontSize: '82px', // Larger, bolder font size
+  titleFontWeight: '900', // Extra bold weight
+  titleLineSpacing: -10, // Snug line spacing between 'Marble' and 'Mountain'
+  titleTextColor: '#fdf6e7', // Light beige color (same as button labels)
+  titleStrokeColor: '#3a2415', // Soft warm contour for crisp legibility on pastel background
+  titleStrokeThickness: 3, // Contour thickness
 
   // Tactile Wood Squircle Buttons (Deep 3D Press & Shading)
   buttonWidth: 290,
@@ -134,9 +128,9 @@ export class TitleScene extends Phaser.Scene {
     this.mainContainer = this.add.container(0, 0);
     this.mainContainer.setDepth(10);
 
-    // 1. Tilted 3D Extruded Title (/___\ perspective without signboard)
-    const titleContainer = this.createTilted3DTitle(width);
-    this.mainContainer.add(titleContainer);
+    // 1. Flat Bold Title in Light Beige
+    const titleText = this.createFlatTitle(width);
+    this.mainContainer.add(titleText);
 
     // 2. Tactile 3D Wood Squircle 'Play' Button
     const playButton = this.createTactileWoodButton({
@@ -157,90 +151,22 @@ export class TitleScene extends Phaser.Scene {
     this.mainContainer.add(optionsButton);
   }
 
-  private createTilted3DTitle(width: number): Phaser.GameObjects.Container {
-    const container = this.add.container(width / 2, TITLE_CONFIG.titleY);
+  private createFlatTitle(width: number): Phaser.GameObjects.Text {
     const fontStack = '"Quicksand", "Nunito", "ui-rounded", -apple-system, BlinkMacSystemFont, sans-serif';
 
-    // Renders chunky 3D text with deep underside shadows viewed from below
-    const render3DWord = (
-      word: string,
-      y: number,
-      fontSize: string,
-      scaleX: number,
-      scaleY: number
-    ) => {
-      const depth = TITLE_CONFIG.titleExtrusionDepth;
+    const text = this.add.text(width / 2, TITLE_CONFIG.titleY, 'Marble\nMountain', {
+      fontFamily: fontStack,
+      fontSize: TITLE_CONFIG.titleFontSize,
+      fontStyle: TITLE_CONFIG.titleFontWeight,
+      color: TITLE_CONFIG.titleTextColor,
+      align: 'center',
+      lineSpacing: TITLE_CONFIG.titleLineSpacing,
+      stroke: TITLE_CONFIG.titleStrokeColor,
+      strokeThickness: TITLE_CONFIG.titleStrokeThickness,
+    });
+    text.setOrigin(0.5);
 
-      // 1. Soft contact ground shadow cast underneath
-      const groundShadow = this.add.text(0, y + depth + 6, word, {
-        fontFamily: fontStack,
-        fontSize,
-        fontStyle: '900',
-        color: '#1a0e05',
-        align: 'center',
-        stroke: '#1a0e05',
-        strokeThickness: TITLE_CONFIG.titleStrokeThickness + 2,
-      });
-      groundShadow.setOrigin(0.5);
-      groundShadow.setScale(scaleX, scaleY);
-      groundShadow.setAlpha(0.24);
-      container.add(groundShadow);
-
-      // 2. Extrusion layers simulating the physical thickness & shaded undersides seen from below
-      // Rendered from bottom layer (deepest underside) up to top
-      for (let i = depth; i >= 1; i--) {
-        const t = i / depth;
-        // Deep underside gradient from dark base to upper bevel
-        const shade = t > 0.5 ? TITLE_CONFIG.titleUndersideDark : TITLE_CONFIG.titleUndersideMid;
-
-        const slice = this.add.text(0, y + i * 1.2, word, {
-          fontFamily: fontStack,
-          fontSize,
-          fontStyle: '900',
-          color: shade,
-          align: 'center',
-          stroke: shade,
-          strokeThickness: TITLE_CONFIG.titleStrokeThickness,
-        });
-        slice.setOrigin(0.5);
-        slice.setScale(scaleX, scaleY);
-        container.add(slice);
-      }
-
-      // 3. Front Face of the 3D letter block
-      const frontFace = this.add.text(0, y, word, {
-        fontFamily: fontStack,
-        fontSize,
-        fontStyle: '900',
-        color: TITLE_CONFIG.titleTextColor,
-        align: 'center',
-        stroke: TITLE_CONFIG.titleStrokeColor,
-        strokeThickness: TITLE_CONFIG.titleStrokeThickness,
-      });
-      frontFace.setOrigin(0.5);
-      frontFace.setScale(scaleX, scaleY);
-      container.add(frontFace);
-    };
-
-    // Render 'Marble' (narrower at top) and 'Mountain' (wider at base)
-    // Closely spaced lines for unified 3D block appearance
-    render3DWord(
-      'Marble',
-      TITLE_CONFIG.titleMarbleY,
-      TITLE_CONFIG.titleMarbleFontSize,
-      TITLE_CONFIG.titleMarbleScaleX,
-      0.82
-    );
-
-    render3DWord(
-      'Mountain',
-      TITLE_CONFIG.titleMountainY,
-      TITLE_CONFIG.titleMountainFontSize,
-      TITLE_CONFIG.titleMountainScaleX,
-      0.86
-    );
-
-    return container;
+    return text;
   }
 
   private createOptionsContent(width: number): void {
