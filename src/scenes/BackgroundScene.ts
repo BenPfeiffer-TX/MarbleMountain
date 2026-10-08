@@ -157,4 +157,13 @@ export class BackgroundScene extends Phaser.Scene {
   public setPaused(paused: boolean): void {
     this.isPaused = paused;
   }
+
+  public setFrostedBlur(enabled: boolean): void {
+    if (!this.cameras?.main?.postFX) return;
+    if (enabled) {
+      this.cameras.main.postFX.addBlur(2, 4, 4, 2);
+    } else {
+      this.cameras.main.postFX.clear();
+    }
+  }
 }
