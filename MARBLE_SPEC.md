@@ -51,9 +51,11 @@ When the bar rotates with angular velocity $\omega$:
 $$a_{\text{centrifugal}} = s \cdot \omega^2$$
 
 ### 3. Friction & Rapid Braking
-$$a_{\text{friction}} = -\text{sign}(v_s) \cdot \mu_{\text{roll}} \quad (\mu_{\text{roll}} = 160\text{px/s}^2)$$
-- When the player reverses the tilt of the bar ($\sin\theta$ opposes $v_s$), gravity and rolling resistance combine to decelerate the marble rapidly ($\approx 500\text{px/s}^2$), allowing quick stops.
-- **Static Hold Threshold**: When $|\sin\theta| < 0.015\text{ rad}$ ($\approx 0.86^\circ$) and $|v_s| < 14\text{px/s}$, the marble remains stationary without drift.
+$$a_{\text{friction}} = -\text{sign}(v_s) \cdot \min(\mu_{\text{roll}}, |v_s| / dt) \quad (\mu_{\text{roll}} = 22\text{px/s}^2)$$
+$$a_{\text{drag}} = -v_s \cdot D_{\text{roll}} \quad (D_{\text{roll}} = 0.30)$$
+- **Gentle Roll Threshold**: Lowering $\mu_{\text{roll}}$ to $22\text{px/s}^2$ allows the marble to begin rolling smoothly at just $\approx 1.3^\circ$ tilt (instead of $>10^\circ$).
+- **Counter-Tilt Braking**: When reversing the bar tilt ($\sin\theta$ opposes $v_s$), gravitational slope deceleration ($>250\text{px/s}^2$) and rolling resistance combine to bring the ball to a full stop in $\approx 0.4$ seconds.
+- **Static Hold Threshold**: When $|\sin\theta| < 0.010\text{ rad}$ ($\approx 0.57^\circ$) and $|v_s| < 1.0\text{px/s}$, the marble remains stationary without micro-drift.
 
 ---
 

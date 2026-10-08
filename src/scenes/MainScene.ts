@@ -90,6 +90,11 @@ export class MainScene extends Phaser.Scene {
     this.rightAnchorY = barCenterY;
     this.leftFilteredY = barCenterY;
     this.rightFilteredY = barCenterY;
+    this.leftPointerId = null;
+    this.rightPointerId = null;
+    this.currentAngleRad = 0;
+    this.targetAngleRad = 0;
+    this.angularVelocity = 0;
     this.isGameOverActive = false;
 
     // Ensure persistent BackgroundScene is running behind MainScene
@@ -407,6 +412,14 @@ export class MainScene extends Phaser.Scene {
     if (this.playContainer.postFX) {
       this.playContainer.postFX.clear();
     }
+
+    // Reset bar angle and velocity
+    this.currentAngleRad = 0;
+    this.targetAngleRad = 0;
+    this.angularVelocity = 0;
+    this.leftPointerId = null;
+    this.rightPointerId = null;
+    this.barContainer.setRotation(0);
 
     this.gameOverModal.hide(() => {
       this.scene.start('TitleScene');

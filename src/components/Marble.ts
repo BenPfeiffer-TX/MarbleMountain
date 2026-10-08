@@ -267,20 +267,19 @@ export class Marble extends Phaser.GameObjects.Container {
       // 2. Centrifugal acceleration outward from center: s * omega^2
       const aCentrifugal = this.s * (barAngularVel * barAngularVel);
 
-      // 3. Rolling Friction & Rapid Braking
-      let friction = 0;
-      if (Math.abs(this.v_s) > 1.0) {
-        friction = -Math.sign(this.v_s) * MARBLE_CONFIG.rollingFriction;
-      }
+      // 3. Rolling Resistance (Friction + Viscous Rolling Drag)
+      const drag = -this.v_s * MARBLE_CONFIG.rollingDrag;
+      const frictionMagnitude = Math.min(MARBLE_CONFIG.rollingFriction, Math.abs(this.v_s) / dt);
+      const friction = this.v_s !== 0 ? -Math.sign(this.v_s) * frictionMagnitude : 0;
 
-      // Static friction: When nearly level and almost stopped, hold position without drift
+      // Static friction: When nearly flat and essentially stopped, hold position without micro-drift
       if (
         Math.abs(sinTilt) < MARBLE_CONFIG.staticFrictionAngleRad &&
-        Math.abs(this.v_s) < 14
+        Math.abs(this.v_s) < 1.0
       ) {
         this.v_s = 0;
       } else {
-        const totalAccel = aGravity + aCentrifugal + friction;
+        const totalAccel = aGravity + aCentrifugal + friction + drag;
         this.v_s += totalAccel * dt;
         this.v_s = Phaser.Math.Clamp(
           this.v_s,

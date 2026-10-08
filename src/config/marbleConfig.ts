@@ -13,8 +13,9 @@ export const MARBLE_CONFIG = {
   // Physical Inertia & Gravity
   gravity: 1400, // Pixels / sec^2 for downward gravitational acceleration
   rollingAccelerationFactor: 5 / 7, // Physics ratio for solid sphere rolling without slipping (I = 2/5 M R^2)
-  rollingFriction: 160, // Friction deceleration (px/s^2) allowing rapid stops when counter-tilting
-  staticFrictionAngleRad: 0.015, // Threshold angle (~0.86 deg) below which stationary marble doesn't drift
+  rollingFriction: 22, // Lowered from 160 so marble begins rolling at ~1.3 deg instead of 10+ deg
+  rollingDrag: 0.30, // Subtle linear viscous rolling drag for smooth speed feel
+  staticFrictionAngleRad: 0.010, // Small threshold (~0.57 deg) below which stationary marble doesn't drift
   maxRollSpeed: 850, // Maximum linear velocity along the bar (px/s)
 
   // Arrival Inertia & Bounce (Entering play scene from title screen)
