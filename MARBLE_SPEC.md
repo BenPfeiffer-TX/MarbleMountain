@@ -25,18 +25,22 @@ This document records the exact parameters, physics models, visual styling, and 
 
 ---
 
-## 3. Reflective Shiny Steel Ball Bearing Visuals
+## 3. Reflective Shiny Steel Ball Bearing Visuals (2-Layer Composition)
 - **Authentic Polished Bearing Design**:
   - The marble renders as a clean, mirror-polished chrome steel ball bearing.
-  - Artificial visual aids (circumference lines, equator seams, surface grain arcs, and separate lighting overlays) have been completely removed.
-- **Spherical Specular Shading**:
-  - Blinding hot-white specular core (`#ffffff`) centered at $(-0.32 R, -0.32 R)$.
-  - Smooth silver transition (`#f0f5fa` $\rightarrow$ `#d4dee6` $\rightarrow$ `#8e9da8`).
-  - Subtle ambient underside ground reflection (`rgba(215, 230, 245, 0.24)`) on the lower crescent.
-  - Crisp outer steel contour rim (`#1c2024`).
-- **Decoupled Texture Architecture**:
-  - The ball bearing texture and contact drop shadow are generated and managed by [`src/themes/defaultTheme.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/themes/defaultTheme.ts) and [`src/themes/themeManager.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/themes/themeManager.ts).
-  - Clean separation allows the marble appearance to be themed or swapped seamlessly.
+  - Artificial visual aids (circumference lines, equator seams, and surface grain arcs) have been completely removed.
+- **2-Layer Composition**:
+  - **Layer 1 (Base Body - `ensureBaseTexture`)**:
+    - Dark outer steel contour rim (`#1c2024`).
+    - Smooth spherical chrome radial base gradient from `#eaf0f5` (bright metallic tone) through `#d0dce4`, `#8e9da8`, `#54606a`, to `#2d3339` ambient edge.
+    - Subtle ambient underside ground reflection (`rgba(215, 230, 245, 0.24)`) on the lower crescent.
+    - `rotatesBody`: Controls whether the base layer rotates as the marble rolls.
+  - **Layer 2 (Stationary Overlay - `ensureOverlayTexture`)**:
+    - Hot-white specular flare centered at $(-0.32 R, -0.32 R)$ with blinding white core (`#ffffff`), glare halo, and smooth transparent falloff.
+    - Stays completely stationary relative to the overhead light source regardless of ball rolling velocity.
+- **Decoupled Architecture**:
+  - The base body, specular overlay, and contact drop shadow are generated and managed by [`src/themes/defaultTheme.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/themes/defaultTheme.ts) and [`src/themes/themeManager.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/themes/themeManager.ts).
+  - This 2-layer composition guarantees that future patterned themes (e.g. 8-balls or striped marbles) can physically rotate their pattern on Layer 1 while keeping their 3D specular shine locked to the light source on Layer 2.
 
 ---
 
@@ -104,7 +108,7 @@ $$a_{\text{drag}} = -v_s \cdot D_{\text{roll}} \quad (D_{\text{roll}} = 0.30)$$
 To support simultaneously changing visual themes (e.g., from classic wood to glowing neon or retro chrome) in a future feature without cluttering gameplay logic:
 
 1. **Theme Contracts** ([`src/themes/types.ts`](file:///storage/emulated/10/antigravity-projects/Marble%20Mountain/src/themes/types.ts)):
-   - `MarbleTheme`: Texture generation (`ensureTexture`) and drop shadow rendering (`drawShadow`), with an optional `rotatesTexture` flag.
+   - `MarbleTheme`: 2-layer composition supporting rolling base body (`ensureBaseTexture`), optional stationary specular gloss overlay (`ensureOverlayTexture`), drop shadow rendering (`drawShadow`), and `rotatesBody` flag.
    - `BarTheme`: Bar surface and bevel rendering (`drawBar`).
    - `ButtonTheme`: Base extrusion (`drawBase`), movable face plate (`drawFace`), dark press shading (`drawPressShade`), font stack, and text colors.
    - `GameTheme`: Aggregates `MarbleTheme`, `BarTheme`, and `ButtonTheme`.

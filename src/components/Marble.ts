@@ -39,9 +39,10 @@ export class Marble extends Phaser.GameObjects.Container {
   // Rolling rotation angle around center (radians)
   private rollAngle: number = 0;
 
-  // Visual sub-elements
+  // Visual sub-elements (2-layer composition)
   private dropShadow!: Phaser.GameObjects.Graphics;
-  private marbleSprite!: Phaser.GameObjects.Image;
+  private bodySprite!: Phaser.GameObjects.Image; // Layer 1: Base sphere / pattern that physically rolls
+  private overlaySprite?: Phaser.GameObjects.Image; // Layer 2: Stationary specular highlight & 3D gloss
   private unsubscribeTheme?: () => void;
 
   private onGameOverCallback?: () => void;
@@ -75,10 +76,21 @@ export class Marble extends Phaser.GameObjects.Container {
     theme.drawShadow(this.dropShadow, r);
     this.add(this.dropShadow);
 
-    // 2. Shiny Metal Ball Bearing Sprite
-    const textureKey = theme.ensureTexture(this.scene.textures, r);
-    this.marbleSprite = this.scene.add.image(0, 0, textureKey);
-    this.add(this.marbleSprite);
+    // 2. Base Body Sprite (Layer 1 - rolls with physics if theme.rotatesBody is true)
+    const baseKey = theme.ensureBaseTexture
+      ? theme.ensureBaseTexture(this.scene.textures, r)
+      : theme.ensureTexture!(this.scene.textures, r);
+    this.bodySprite = this.scene.add.image(0, 0, baseKey);
+    this.add(this.bodySprite);
+
+    // 3. Stationary Overlay Sprite (Layer 2 - fixed specular gloss & lighting)
+    const overlayKey = theme.ensureOverlayTexture
+      ? theme.ensureOverlayTexture(this.scene.textures, r)
+      : null;
+    if (overlayKey) {
+      this.overlaySprite = this.scene.add.image(0, 0, overlayKey);
+      this.add(this.overlaySprite);
+    }
   }
 
   /**
@@ -86,13 +98,34 @@ export class Marble extends Phaser.GameObjects.Container {
    */
   public applyTheme(theme: MarbleTheme): void {
     const r = MARBLE_CONFIG.radius;
-    const key = theme.ensureTexture(this.scene.textures, r);
-    if (this.marbleSprite) {
-      this.marbleSprite.setTexture(key);
-      if (!theme.rotatesTexture) {
-        this.marbleSprite.setRotation(0);
+    const baseKey = theme.ensureBaseTexture
+      ? theme.ensureBaseTexture(this.scene.textures, r)
+      : theme.ensureTexture!(this.scene.textures, r);
+
+    if (this.bodySprite) {
+      this.bodySprite.setTexture(baseKey);
+      const shouldRotate = theme.rotatesBody ?? theme.rotatesTexture ?? false;
+      if (!shouldRotate) {
+        this.bodySprite.setRotation(0);
       }
     }
+
+    const overlayKey = theme.ensureOverlayTexture
+      ? theme.ensureOverlayTexture(this.scene.textures, r)
+      : null;
+
+    if (overlayKey) {
+      if (!this.overlaySprite) {
+        this.overlaySprite = this.scene.add.image(0, 0, overlayKey);
+        this.add(this.overlaySprite);
+      } else {
+        this.overlaySprite.setTexture(overlayKey);
+        this.overlaySprite.setVisible(true);
+      }
+    } else if (this.overlaySprite) {
+      this.overlaySprite.setVisible(false);
+    }
+
     if (this.dropShadow) {
       theme.drawShadow(this.dropShadow, r);
     }
@@ -115,8 +148,8 @@ export class Marble extends Phaser.GameObjects.Container {
     this.h = 0;
     this.v_h = 0;
     this.rollAngle = 0;
-    if (this.marbleSprite) {
-      this.marbleSprite.setRotation(0);
+    if (this.bodySprite) {
+      this.bodySprite.setRotation(0);
     }
     const theme = ThemeManager.getActiveTheme().marble;
     theme.drawShadow(this.dropShadow, MARBLE_CONFIG.radius);
@@ -243,8 +276,9 @@ export class Marble extends Phaser.GameObjects.Container {
       // Pure rolling rotation: distance rolled / radius = rotation in radians
       this.rollAngle += (this.v_s * dt) / r;
       const theme = ThemeManager.getActiveTheme().marble;
-      if (theme.rotatesTexture) {
-        this.marbleSprite.setRotation(this.rollAngle);
+      const shouldRotate = theme.rotatesBody ?? theme.rotatesTexture ?? false;
+      if (shouldRotate && this.bodySprite) {
+        this.bodySprite.setRotation(this.rollAngle);
       }
 
       // Calculate world position on the bar surface
@@ -276,8 +310,9 @@ export class Marble extends Phaser.GameObjects.Container {
 
       this.rollAngle += (this.v_s / r) * dt;
       const theme = ThemeManager.getActiveTheme().marble;
-      if (theme.rotatesTexture) {
-        this.marbleSprite.setRotation(this.rollAngle);
+      const shouldRotate = theme.rotatesBody ?? theme.rotatesTexture ?? false;
+      if (shouldRotate && this.bodySprite) {
+        this.bodySprite.setRotation(this.rollAngle);
       }
 
       this.x = this.worldX;

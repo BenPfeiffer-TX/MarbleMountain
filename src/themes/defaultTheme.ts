@@ -13,10 +13,11 @@ import { GameTheme, MarbleTheme, BarTheme, ButtonTheme } from './types';
 export const shinySteelBearingMarbleTheme: MarbleTheme = {
   id: 'shinySteelBallBearing',
   name: 'Shiny Steel Ball Bearing',
+  rotatesBody: false,
   rotatesTexture: false,
 
-  ensureTexture(textures: Phaser.Textures.TextureManager, radius: number): string {
-    const key = `marble_ball_bearing_${radius}`;
+  ensureBaseTexture(textures: Phaser.Textures.TextureManager, radius: number): string {
+    const key = `marble_steel_bearing_base_${radius}`;
     if (textures.exists(key)) return key;
 
     const size = radius * 2 + 4;
@@ -34,20 +35,18 @@ export const shinySteelBearingMarbleTheme: MarbleTheme = {
     ctx.fillStyle = '#1c2024';
     ctx.fill();
 
-    // 2. Spherical polished chrome radial gradient
-    // Specular highlight centered at (-0.32r, -0.32r)
+    // 2. Spherical polished chrome radial base gradient
     const grad = ctx.createRadialGradient(
-      cx - r * 0.32,
-      cy - r * 0.32,
-      r * 0.04,
-      cx - r * 0.08,
-      cy - r * 0.08,
+      cx - r * 0.25,
+      cy - r * 0.25,
+      r * 0.08,
+      cx - r * 0.05,
+      cy - r * 0.05,
       r * 1.05
     );
-    grad.addColorStop(0.0, '#ffffff'); // Blinding hot-white specular core
-    grad.addColorStop(0.12, '#f0f5fa'); // Bright silver-white glare
-    grad.addColorStop(0.28, '#d4dee6'); // Polished chrome sheen
-    grad.addColorStop(0.55, '#8e9da8'); // Mid metallic steel tone
+    grad.addColorStop(0.0, '#eaf0f5'); // Bright polished metallic tone
+    grad.addColorStop(0.20, '#d0dce4'); // Silver mid-sheen
+    grad.addColorStop(0.50, '#8e9da8'); // Mid metallic steel tone
     grad.addColorStop(0.80, '#54606a'); // Shadowed steel curvature
     grad.addColorStop(0.94, '#2d3339'); // Deep ambient edge rim
     grad.addColorStop(1.0, '#1c2024'); // Outer steel contour
@@ -77,6 +76,50 @@ export const shinySteelBearingMarbleTheme: MarbleTheme = {
 
     canvas.refresh();
     return key;
+  },
+
+  ensureOverlayTexture(textures: Phaser.Textures.TextureManager, radius: number): string | null {
+    const key = `marble_steel_bearing_overlay_${radius}`;
+    if (textures.exists(key)) return key;
+
+    const size = radius * 2 + 4;
+    const canvas = textures.createCanvas(key, size, size);
+    if (!canvas) return null;
+
+    const ctx = canvas.getContext();
+    const cx = size / 2;
+    const cy = size / 2;
+    const r = radius;
+
+    // Specular highlight centered top-left at (-0.32r, -0.32r)
+    const hx = cx - r * 0.32;
+    const hy = cy - r * 0.32;
+
+    // Hot-white specular flare with smooth falloff
+    const specGrad = ctx.createRadialGradient(
+      hx,
+      hy,
+      0,
+      hx,
+      hy,
+      r * 0.38
+    );
+    specGrad.addColorStop(0.0, 'rgba(255, 255, 255, 1.0)'); // Blinding white core
+    specGrad.addColorStop(0.25, 'rgba(255, 255, 255, 0.90)'); // Bright white glare
+    specGrad.addColorStop(0.55, 'rgba(240, 248, 255, 0.35)'); // Soft silver falloff
+    specGrad.addColorStop(1.0, 'rgba(255, 255, 255, 0.0)'); // Fully transparent edge
+
+    ctx.beginPath();
+    ctx.arc(hx, hy, r * 0.38, 0, Math.PI * 2);
+    ctx.fillStyle = specGrad;
+    ctx.fill();
+
+    canvas.refresh();
+    return key;
+  },
+
+  ensureTexture(textures: Phaser.Textures.TextureManager, radius: number): string {
+    return this.ensureBaseTexture(textures, radius);
   },
 
   drawShadow(g: Phaser.GameObjects.Graphics, radius: number): void {

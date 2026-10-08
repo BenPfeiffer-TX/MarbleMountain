@@ -13,15 +13,31 @@ export interface MarbleTheme {
   id: string;
   name: string;
   /**
-   * Whether the marble sprite rotates when rolling.
-   * False for reflective metallic spheres with fixed specular highlight;
-   * True for patterned or textured spheres (e.g., striped, 8-ball).
+   * Whether the base body layer rotates with the ball's rolling velocity.
+   * True for patterned or textured spheres (e.g. striped, 8-ball);
+   * False for isotropic or uniform reflective spheres.
+   */
+  rotatesBody?: boolean;
+  /**
+   * Legacy alias for rotatesBody.
    */
   rotatesTexture?: boolean;
   /**
-   * Generates or retrieves the texture key for this marble theme.
+   * Generates or retrieves the base body texture key (Layer 1).
+   * This represents the sphere's surface material, color, or pattern that physically rolls.
    */
-  ensureTexture(textures: Phaser.Textures.TextureManager, radius: number): string;
+  ensureBaseTexture(textures: Phaser.Textures.TextureManager, radius: number): string;
+  /**
+   * Generates or retrieves the stationary overlay texture key (Layer 2, optional).
+   * Renders stationary 3D spherical shading, specular gloss highlights, or lighting glares
+   * that remain fixed relative to the overhead light source regardless of ball rolling.
+   * Return null or undefined if the theme has no overlay.
+   */
+  ensureOverlayTexture?(textures: Phaser.Textures.TextureManager, radius: number): string | null;
+  /**
+   * Optional single-layer texture generator for backwards compatibility.
+   */
+  ensureTexture?(textures: Phaser.Textures.TextureManager, radius: number): string;
   /**
    * Draws the drop shadow beneath the marble onto the given Graphics object.
    */
