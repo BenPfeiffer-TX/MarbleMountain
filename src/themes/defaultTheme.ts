@@ -313,6 +313,70 @@ export const classicWoodHoleTheme: HoleTheme = {
     g.strokePath();
   },
 
+  drawCircleHole(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+    radius: number
+  ): void {
+    // 1. Deep pitch black pit interior
+    g.fillStyle(0x050507, 1.0);
+    g.fillCircle(cx, cy, radius);
+
+    // 2. Soft inner ambient occlusion shadow along top-left rim
+    g.fillStyle(0x000000, 0.45);
+    g.beginPath();
+    g.arc(cx, cy, radius - 1.5, Math.PI, 2 * Math.PI, false);
+    g.arc(cx, cy + 4, radius - 5, 2 * Math.PI, Math.PI, true);
+    g.closePath();
+    g.fillPath();
+
+    // 3. Thick warm wood border matching the bar and buttons
+    g.lineStyle(4.5, 0x9c6638, 1.0);
+    g.strokeCircle(cx, cy, radius);
+
+    // 4. Outer dark contour bevel
+    g.lineStyle(1.5, 0x5a3617, 0.55);
+    g.strokeCircle(cx, cy, radius + 1);
+
+    // 5. Subtle top-edge lighter highlight
+    g.lineStyle(1.5, 0xb57c4c, 0.65);
+    g.beginPath();
+    g.arc(cx, cy, radius, -Math.PI * 0.75, -Math.PI * 0.25, false);
+    g.strokePath();
+  },
+
+  drawPolygonHole(
+    g: Phaser.GameObjects.Graphics,
+    points: { x: number; y: number }[]
+  ): void {
+    if (points.length < 3) return;
+
+    // 1. Deep pitch black pit interior
+    g.fillStyle(0x050507, 1.0);
+    g.beginPath();
+    g.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      g.lineTo(points[i].x, points[i].y);
+    }
+    g.closePath();
+    g.fillPath();
+
+    // 2. Thick warm wood border matching the bar and buttons
+    g.lineStyle(4.5, 0x9c6638, 1.0);
+    g.beginPath();
+    g.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      g.lineTo(points[i].x, points[i].y);
+    }
+    g.closePath();
+    g.strokePath();
+
+    // 3. Outer dark contour bevel
+    g.lineStyle(1.5, 0x5a3617, 0.55);
+    g.strokePath();
+  },
+
   drawTick(
     g: Phaser.GameObjects.Graphics,
     x: number,

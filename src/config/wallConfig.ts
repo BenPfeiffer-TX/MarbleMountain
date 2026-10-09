@@ -16,25 +16,40 @@ export const WALL_CONFIG = {
   tickRightX: 712, // X origin of right tick gauge
 
   // Continuous Procedural Obstacle Distribution
-  stepMinY: 48, // Vertical advance min step for dense staggered generation (px)
-  stepMaxY: 70, // Vertical advance max step for dense staggered generation (px)
-  minHoleGap: 20, // Minimum clearance buffer between distinct holes (px)
+  stepMinY: 50, // Vertical advance min step for dense staggered generation (px)
+  stepMaxY: 75, // Vertical advance max step for dense staggered generation (px)
+  minHoleGap: 18, // Minimum clearance buffer between distinct holes (px)
   minSafeCorridorWidth: 115, // Guaranteed safe gap width along every horizontal slice (marble diameter is 50px)
-  corridorAnchorStep: 90, // Vertical distance between smooth corridor control points
-  maxCorridorShiftPerAnchor: 95, // Maximum smooth horizontal drift per anchor (px)
+  corridorAnchorStep: 80, // Vertical distance between smooth corridor control points
+  corridorWavelengthY: 220, // Vertical distance for a full half-weave (side-to-side oscillation)
+  corridorLeftX: 195, // Safe corridor target center on the left side
+  corridorRightX: 525, // Safe corridor target center on the right side
   initialBottomRatio: 0.50, // Shapes start halfway down the screen (50% viewport height)
 
-  // Hole Dimensions (Varied, prominent obstacles)
-  rectMinWidth: 90,
-  rectMaxWidth: 180,
-  rectMinHeight: 70,
-  rectMaxHeight: 125,
-  rectCornerRadius: 10,
+  // Long & Angled Rectangles
+  rectMinLength: 120,
+  rectMaxLength: 250,
+  rectMinThickness: 50,
+  rectMaxThickness: 90,
+  rectMaxAngleDeg: 55, // Degrees of diagonal tilt
 
-  triMinBase: 95,
-  triMaxBase: 175,
-  triMinHeight: 75,
-  triMaxHeight: 130,
+  // Stretched & Rotated Triangles
+  triMinBase: 90,
+  triMaxBase: 180,
+  triMinHeight: 80,
+  triMaxHeight: 165,
+
+  // Non-Polygonal Shapes: Circles, Ellipses, Beans
+  circleMinRadius: 28,
+  circleMaxRadius: 52,
+  ellipseMinRx: 60,
+  ellipseMaxRx: 110,
+  ellipseMinRy: 35,
+  ellipseMaxRy: 60,
+  beanMinLength: 85,
+  beanMaxLength: 160,
+  beanMinLobeRadius: 30,
+  beanMaxLobeRadius: 50,
 
   // Playable Boundaries within the 720px viewport
   playableMarginLeft: 45,

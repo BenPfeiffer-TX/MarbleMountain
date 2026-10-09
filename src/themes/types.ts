@@ -121,6 +121,22 @@ export interface HoleTheme {
     p3: { x: number; y: number }
   ): void;
   /**
+   * Draws a circular hole with theme-textured border and deep pit interior.
+   */
+  drawCircleHole(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+    radius: number
+  ): void;
+  /**
+   * Draws a general polygon / curved hole with theme-textured border and deep pit interior.
+   */
+  drawPolygonHole(
+    g: Phaser.GameObjects.Graphics,
+    points: { x: number; y: number }[]
+  ): void;
+  /**
    * Draws an altitude tick mark on the speed gauge.
    */
   drawTick(

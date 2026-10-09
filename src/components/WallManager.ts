@@ -1,50 +1,43 @@
 import Phaser from 'phaser';
 import { WALL_CONFIG } from '../config/wallConfig';
 import { ThemeManager } from '../themes/themeManager';
+import {
+  Hole,
+  createRectHole,
+  createTriHole,
+  createCircleHole,
+  createEllipseHole,
+  createBeanHole,
+  isPointInHole,
+  renderHole,
+} from './wallShapes';
 
-export interface RectHole {
-  type: 'rect';
-  id: string;
-  x: number; // Top-left X in wall coordinate space
-  y: number; // Top-left Y in wall coordinate space
-  w: number;
-  h: number;
-  r: number;
-}
-
-export interface TriHole {
-  type: 'tri';
-  id: string;
-  p1: { x: number; y: number }; // In wall coordinate space
-  p2: { x: number; y: number };
-  p3: { x: number; y: number };
-}
-
-export type Hole = RectHole | TriHole;
+export type { Hole };
 
 /**
  * WALL MANAGER COMPONENT
  *
- * Controls:
- * 1. Procedural generation of triangular and rectangular wall holes.
- * 2. Strict solvability invariant (every horizontal slice has a guaranteed safe passage corridor).
- * 3. Wall scrolling motion and speed.
- * 4. Speed gauge altitude tick marks along screen edges (1 tick passes bar every second).
- * 5. High-precision point-in-hole collision detection.
- * 6. Dynamic theme integration via ThemeManager.
+ * Implements:
+ * 1. Procedural generation of organic shapes: long angled slots/capsules, stretched rotated triangles,
+ *    circles, rotated ellipses, and organic curved kidney beans.
+ * 2. Dynamic S-curve weaving safe corridor ensuring obstacles cut across the center, forcing active player tilt control.
+ * 3. Strict solvability invariant (every horizontal slice is guaranteed a navigable opening >= 115px).
+ * 4. High-density, non-linear staggered obstacle distribution with no horizontal rows or lines.
+ * 5. Synchronized altitude tick speed gauge (1 tick/sec).
+ * 6. High-precision point-in-hole collision tests and thematic rendering.
  */
 export class WallManager extends Phaser.GameObjects.Container {
   private holesGraphics!: Phaser.GameObjects.Graphics;
   private ticksGraphics!: Phaser.GameObjects.Graphics;
 
   private isScrolling: boolean = false;
-  private wallOffsetY: number = 0; // Cumulative vertical scroll offset
+  private wallOffsetY: number = 0; // Cumulative downward scroll offset (px)
   private highestGeneratedY: number = 0; // Top-most generated wall Y coordinate
-  private corridorAnchors: { y: number; x: number }[] = []; // Smooth meandering corridor control points
+  private corridorAnchors: { y: number; x: number }[] = []; // Smooth S-curve corridor control points
+  private corridorTargetSide: 'left' | 'right' = 'left';
 
   private holes: Hole[] = [];
   private unsubscribeTheme?: () => void;
-
   private nextHoleId: number = 1;
 
   constructor(scene: Phaser.Scene) {
@@ -77,7 +70,8 @@ export class WallManager extends Phaser.GameObjects.Container {
 
   /**
    * Starts downward wall progression.
-   * Generates a dense, organic obstacle field starting halfway down the screen.
+   * Generates a dense, organic obstacle field starting halfway down the screen with
+   * immediate obstacles in the center requiring player action.
    */
   public startSpawning(): void {
     if (this.isScrolling) return;
@@ -88,7 +82,7 @@ export class WallManager extends Phaser.GameObjects.Container {
       this.highestGeneratedY = h * (WALL_CONFIG.initialBottomRatio ?? 0.50);
       this.corridorAnchors = [];
       // Pre-generate dense continuous obstacle field upward past the top of viewport
-      this.generateUpTo(-400);
+      this.generateUpTo(-450);
       this.renderAll(h);
     }
   }
@@ -115,8 +109,7 @@ export class WallManager extends Phaser.GameObjects.Container {
 
   /**
    * Continuous Procedural Generator:
-   * Advances upward in fine-grained, jittered vertical steps to create a dense,
-   * organic, non-linear scattering of triangular and rectangular holes.
+   * Advances upward in fine-grained vertical steps, placing varied organic shapes.
    */
   private generateUpTo(targetTopY: number): void {
     this.ensureCorridorAnchorsUpTo(targetTopY - 250);
@@ -129,32 +122,48 @@ export class WallManager extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Ensures smooth corridor anchor points exist up to targetTopY.
+   * Constructs the meandering S-curve safe corridor spine.
+   * Alternates target side between Left (X ~ 195) and Right (X ~ 525), forcing obstacles
+   * to cut directly across the center of the board.
    */
   private ensureCorridorAnchorsUpTo(targetTopY: number): void {
     const minCenter = WALL_CONFIG.playableMarginLeft + WALL_CONFIG.minSafeCorridorWidth / 2 + 15;
     const maxCenter = WALL_CONFIG.playableMarginRight - WALL_CONFIG.minSafeCorridorWidth / 2 - 15;
 
     if (this.corridorAnchors.length === 0) {
-      const initialY = this.highestGeneratedY + 120;
-      const initialX = (minCenter + maxCenter) / 2;
-      this.corridorAnchors.push({ y: initialY, x: initialX });
+      const initialY = this.highestGeneratedY + 100;
+      this.corridorAnchors.push({ y: initialY, x: 360 });
+      // Alternate target side immediately so the first obstacles arrive in the center
+      this.corridorTargetSide = Math.random() > 0.5 ? 'left' : 'right';
     }
 
     while (this.corridorAnchors[this.corridorAnchors.length - 1].y > targetTopY) {
       const last = this.corridorAnchors[this.corridorAnchors.length - 1];
       const nextY = last.y - WALL_CONFIG.corridorAnchorStep;
-      const shift = Phaser.Math.Between(
-        -WALL_CONFIG.maxCorridorShiftPerAnchor,
-        WALL_CONFIG.maxCorridorShiftPerAnchor
-      );
-      const nextX = Phaser.Math.Clamp(last.x + shift, minCenter, maxCenter);
+
+      const targetX =
+        this.corridorTargetSide === 'left' ? WALL_CONFIG.corridorLeftX : WALL_CONFIG.corridorRightX;
+
+      const step = 65;
+      let nextX = last.x;
+      if (Math.abs(last.x - targetX) <= step) {
+        nextX = targetX;
+        // Reached target side: toggle to the other side for the next stretch
+        this.corridorTargetSide = this.corridorTargetSide === 'left' ? 'right' : 'left';
+      } else {
+        nextX = last.x + Math.sign(targetX - last.x) * step;
+      }
+
+      // Add gentle organic wobble
+      nextX += Phaser.Math.Between(-12, 12);
+      nextX = Phaser.Math.Clamp(nextX, minCenter, maxCenter);
+
       this.corridorAnchors.push({ y: nextY, x: nextX });
     }
   }
 
   /**
-   * Computes the exact center of the safe corridor at vertical coordinate Y using smoothstep.
+   * Evaluates the safe corridor center X at vertical coordinate Y using smoothstep.
    */
   private getSafeCorridorCenterX(y: number): number {
     if (this.corridorAnchors.length === 0) {
@@ -180,7 +189,7 @@ export class WallManager extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Returns the extreme envelope of the safe corridor across vertical span [yTop, yBottom].
+   * Returns the extreme horizontal envelope of the safe corridor across vertical span [yTop, yBottom].
    */
   private getSafeCorridorSpan(yTop: number, yBottom: number): { minLeft: number; maxRight: number } {
     const halfW = WALL_CONFIG.minSafeCorridorWidth / 2;
@@ -201,42 +210,29 @@ export class WallManager extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Mathematical Solvability Invariant:
-   * Verifies that the candidate hole does not encroach into the guaranteed safe corridor.
+   * Solvability Invariant:
+   * Ensures the candidate hole does not encroach into the guaranteed safe corridor.
    */
-  private isHoleSafeFromCorridor(x1: number, x2: number, y1: number, y2: number): boolean {
-    const { minLeft, maxRight } = this.getSafeCorridorSpan(y1, y2);
+  private isHoleSafeFromCorridor(hole: Hole): boolean {
+    const { minLeft, maxRight } = this.getSafeCorridorSpan(hole.minY, hole.maxY);
     const margin = 14;
-    return x2 <= minLeft - margin || x1 >= maxRight + margin;
+    return hole.maxX <= minLeft - margin || hole.minX >= maxRight + margin;
   }
 
   /**
-   * Minimum Separation Check:
-   * Ensures holes do not awkwardly overlap one another, keeping their wooden borders crisp.
+   * Separation Check:
+   * Ensures holes do not awkwardly overlap each other, keeping borders distinct.
    */
-  private doesHoleOverlapExisting(x1: number, x2: number, y1: number, y2: number): boolean {
+  private doesHoleOverlapExisting(candidate: Hole): boolean {
     const gap = WALL_CONFIG.minHoleGap;
-    const expX1 = x1 - gap;
-    const expX2 = x2 + gap;
-    const expY1 = y1 - gap;
-    const expY2 = y2 + gap;
+    const cMinX = candidate.minX - gap;
+    const cMaxX = candidate.maxX + gap;
+    const cMinY = candidate.minY - gap;
+    const cMaxY = candidate.maxY + gap;
 
     for (const h of this.holes) {
-      let hx1: number, hx2: number, hy1: number, hy2: number;
-      if (h.type === 'rect') {
-        hx1 = h.x;
-        hx2 = h.x + h.w;
-        hy1 = h.y;
-        hy2 = h.y + h.h;
-      } else {
-        hx1 = Math.min(h.p1.x, h.p2.x, h.p3.x);
-        hx2 = Math.max(h.p1.x, h.p2.x, h.p3.x);
-        hy1 = Math.min(h.p1.y, h.p2.y, h.p3.y);
-        hy2 = Math.max(h.p1.y, h.p2.y, h.p3.y);
-      }
-
-      if (hy2 < expY1 || hy1 > expY2) continue;
-      if (expX1 < hx2 && expX2 > hx1 && expY1 < hy2 && expY2 > hy1) {
+      if (h.maxY < cMinY || h.minY > cMaxY) continue;
+      if (cMinX < h.maxX && cMaxX > h.minX && cMinY < h.maxY && cMaxY > h.minY) {
         return true;
       }
     }
@@ -244,7 +240,7 @@ export class WallManager extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Generates candidates across the horizontal slice at baseY.
+   * Generates candidate obstacles across the horizontal slice at baseY.
    */
   private generateStepAtY(baseY: number): void {
     const minX = WALL_CONFIG.playableMarginLeft;
@@ -257,12 +253,12 @@ export class WallManager extends Phaser.GameObjects.Container {
     const leftW = leftMaxX - minX;
     const rightW = maxX - rightMinX;
 
-    const canLeft = leftW >= 80;
-    const canRight = rightW >= 80;
+    const canLeft = leftW >= 75;
+    const canRight = rightW >= 75;
 
-    // High attempt probability (85%) ensures rich obstacle density
-    let tryLeft = canLeft && Math.random() < 0.85;
-    let tryRight = canRight && Math.random() < 0.85;
+    // High attempt probability (88%) ensures rich obstacle density
+    let tryLeft = canLeft && Math.random() < 0.88;
+    let tryRight = canRight && Math.random() < 0.88;
 
     // Guarantee at least one side is attempted to prevent empty gaps
     if (!tryLeft && !tryRight) {
@@ -283,22 +279,23 @@ export class WallManager extends Phaser.GameObjects.Container {
 
   /**
    * Places 1 or 2 staggered candidate holes within an available horizontal region.
+   * In wide regions (e.g. >= 220px), holes are placed near the center of the board.
    */
   private tryPlaceHoleInRegion(regionMinX: number, regionMaxX: number, baseY: number): boolean {
     const availW = regionMaxX - regionMinX;
     if (availW < 75) return false;
 
-    // If region is wide (>= 230px), place 2 staggered holes with varied Y
-    const shouldSplit = availW >= 230 && Math.random() < 0.50;
+    // In wide regions (>= 220px), place 2 staggered holes with varied Y to pack obstacles
+    const shouldSplit = availW >= 220 && Math.random() < 0.55;
     if (shouldSplit) {
       const halfW = availW / 2;
       const h1 = this.createCandidateHole(
         regionMinX,
-        regionMinX + halfW - 8,
+        regionMinX + halfW - 6,
         baseY + Phaser.Math.Between(-28, 28)
       );
       const h2 = this.createCandidateHole(
-        regionMinX + halfW + 8,
+        regionMinX + halfW + 6,
         regionMaxX,
         baseY + Phaser.Math.Between(-28, 28)
       );
@@ -310,89 +307,90 @@ export class WallManager extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Attempts to generate a single hole (rectangle or triangle) within [minX, maxX] at targetY.
+   * Creates a randomized candidate hole (long angled rectangle, organic bean, circle, ellipse, or triangle).
    */
   private createCandidateHole(minX: number, maxX: number, targetY: number): boolean {
     const availW = maxX - minX;
-    if (availW < 75) return false;
+    if (availW < 70) return false;
 
-    const isTriangle = Math.random() > 0.48;
-
+    // Try up to 3 candidate configurations to maximize packing density
     for (let attempt = 0; attempt < 3; attempt++) {
-      if (isTriangle) {
-        const baseW = Phaser.Math.Clamp(
+      const roll = Math.random();
+      let candidate: Hole | null = null;
+      const id = `hole_${this.nextHoleId++}`;
+
+      if (roll < 0.28) {
+        // 1. Long Angled Rectangle / Capsule Slot
+        const length = Phaser.Math.Clamp(
+          Phaser.Math.Between(WALL_CONFIG.rectMinLength, WALL_CONFIG.rectMaxLength),
+          85,
+          availW - 6
+        );
+        const thickness = Phaser.Math.Between(WALL_CONFIG.rectMinThickness, WALL_CONFIG.rectMaxThickness);
+        const maxAngleRad = Phaser.Math.DegToRad(WALL_CONFIG.rectMaxAngleDeg);
+        const angle = Phaser.Math.FloatBetween(-maxAngleRad, maxAngleRad);
+        const radius = Phaser.Math.Between(10, Math.floor(thickness / 2));
+        const cx = Phaser.Math.Between(minX + length / 2, maxX - length / 2);
+
+        candidate = createRectHole(id, cx, targetY, length, thickness, angle, radius);
+      } else if (roll < 0.54) {
+        // 2. Organic Curved Bean / Peanut / Kidney Hole
+        const length = Phaser.Math.Clamp(
+          Phaser.Math.Between(WALL_CONFIG.beanMinLength, WALL_CONFIG.beanMaxLength),
+          80,
+          availW - 6
+        );
+        const r1 = Phaser.Math.Between(WALL_CONFIG.beanMinLobeRadius, WALL_CONFIG.beanMaxLobeRadius);
+        const r2 = Phaser.Math.Between(WALL_CONFIG.beanMinLobeRadius, WALL_CONFIG.beanMaxLobeRadius);
+        const angle = Phaser.Math.FloatBetween(-Phaser.Math.DegToRad(50), Phaser.Math.DegToRad(50));
+        const bendOffset = Phaser.Math.Between(-20, 20);
+        const cx = Phaser.Math.Between(minX + length / 2, maxX - length / 2);
+
+        candidate = createBeanHole(id, cx, targetY, length, r1, r2, angle, bendOffset);
+      } else if (roll < 0.72) {
+        // 3. Rotated Ellipse / Oval
+        const rx = Phaser.Math.Clamp(
+          Phaser.Math.Between(WALL_CONFIG.ellipseMinRx, WALL_CONFIG.ellipseMaxRx),
+          40,
+          availW / 2 - 4
+        );
+        const ry = Phaser.Math.Between(WALL_CONFIG.ellipseMinRy, WALL_CONFIG.ellipseMaxRy);
+        const angle = Phaser.Math.FloatBetween(-Phaser.Math.DegToRad(45), Phaser.Math.DegToRad(45));
+        const cx = Phaser.Math.Between(minX + rx, maxX - rx);
+
+        candidate = createEllipseHole(id, cx, targetY, rx, ry, angle);
+      } else if (roll < 0.88) {
+        // 4. Stretched & Rotated Triangle
+        const base = Phaser.Math.Clamp(
           Phaser.Math.Between(WALL_CONFIG.triMinBase, WALL_CONFIG.triMaxBase),
           75,
-          availW - 4
+          availW - 6
         );
-        const triH = Phaser.Math.Between(WALL_CONFIG.triMinHeight, WALL_CONFIG.triMaxHeight);
-        const maxStartX = maxX - baseW - 2;
-        const minStartX = minX + 2;
-        if (maxStartX < minStartX) continue;
+        const height = Phaser.Math.Between(WALL_CONFIG.triMinHeight, WALL_CONFIG.triMaxHeight);
+        const skew = Phaser.Math.FloatBetween(-0.35, 0.35);
+        const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+        const cx = Phaser.Math.Between(minX + base / 2, maxX - base / 2);
 
-        const startX = Phaser.Math.Between(minStartX, maxStartX);
-        const isInverted = Math.random() > 0.5;
-
-        const p1 = isInverted
-          ? { x: startX, y: targetY }
-          : { x: startX + baseW / 2, y: targetY };
-        const p2 = isInverted
-          ? { x: startX + baseW, y: targetY }
-          : { x: startX, y: targetY + triH };
-        const p3 = isInverted
-          ? { x: startX + baseW / 2, y: targetY + triH }
-          : { x: startX + baseW, y: targetY + triH };
-
-        const x1 = startX;
-        const x2 = startX + baseW;
-        const y1 = targetY;
-        const y2 = targetY + triH;
-
-        if (
-          this.isHoleSafeFromCorridor(x1, x2, y1, y2) &&
-          !this.doesHoleOverlapExisting(x1, x2, y1, y2)
-        ) {
-          this.holes.push({
-            type: 'tri',
-            id: `hole_${this.nextHoleId++}`,
-            p1,
-            p2,
-            p3,
-          });
-          return true;
-        }
+        candidate = createTriHole(id, cx, targetY, base, height, skew, angle);
       } else {
-        const rectW = Phaser.Math.Clamp(
-          Phaser.Math.Between(WALL_CONFIG.rectMinWidth, WALL_CONFIG.rectMaxWidth),
-          75,
-          availW - 4
+        // 5. Circular Pit
+        const radius = Phaser.Math.Clamp(
+          Phaser.Math.Between(WALL_CONFIG.circleMinRadius, WALL_CONFIG.circleMaxRadius),
+          26,
+          availW / 2 - 4
         );
-        const rectH = Phaser.Math.Between(WALL_CONFIG.rectMinHeight, WALL_CONFIG.rectMaxHeight);
-        const maxStartX = maxX - rectW - 2;
-        const minStartX = minX + 2;
-        if (maxStartX < minStartX) continue;
+        const cx = Phaser.Math.Between(minX + radius, maxX - radius);
 
-        const rectX = Phaser.Math.Between(minStartX, maxStartX);
-        const x1 = rectX;
-        const x2 = rectX + rectW;
-        const y1 = targetY;
-        const y2 = targetY + rectH;
+        candidate = createCircleHole(id, cx, targetY, radius);
+      }
 
-        if (
-          this.isHoleSafeFromCorridor(x1, x2, y1, y2) &&
-          !this.doesHoleOverlapExisting(x1, x2, y1, y2)
-        ) {
-          this.holes.push({
-            type: 'rect',
-            id: `hole_${this.nextHoleId++}`,
-            x: rectX,
-            y: targetY,
-            w: rectW,
-            h: rectH,
-            r: WALL_CONFIG.rectCornerRadius,
-          });
-          return true;
-        }
+      if (
+        candidate &&
+        this.isHoleSafeFromCorridor(candidate) &&
+        !this.doesHoleOverlapExisting(candidate)
+      ) {
+        this.holes.push(candidate);
+        return true;
       }
     }
     return false;
@@ -407,17 +405,11 @@ export class WallManager extends Phaser.GameObjects.Container {
 
       // Generate new obstacles ahead above the viewport
       const screenTopInWallSpace = -this.wallOffsetY;
-      this.generateUpTo(screenTopInWallSpace - 400);
+      this.generateUpTo(screenTopInWallSpace - 450);
 
       // Cull holes that have scrolled past the bottom of the screen
       const screenBottomInWallSpace = screenHeight - this.wallOffsetY + 150;
-      this.holes = this.holes.filter((h) => {
-        if (h.type === 'rect') {
-          return h.y <= screenBottomInWallSpace;
-        } else {
-          return Math.min(h.p1.y, h.p2.y, h.p3.y) <= screenBottomInWallSpace;
-        }
-      });
+      this.holes = this.holes.filter((h) => h.maxY <= screenBottomInWallSpace);
 
       // Cull old corridor anchors far below the screen
       this.corridorAnchors = this.corridorAnchors.filter(
@@ -434,38 +426,14 @@ export class WallManager extends Phaser.GameObjects.Container {
   private renderAll(screenHeight: number = 1280): void {
     const theme = ThemeManager.getActiveTheme().hole;
 
-    // 1. Draw Holes
+    // 1. Draw Visible Holes
     this.holesGraphics.clear();
     for (const hole of this.holes) {
-      if (hole.type === 'rect') {
-        const screenY = hole.y + this.wallOffsetY;
-        // Viewport frustum culling
-        if (screenY + hole.h < -60 || screenY > screenHeight + 60) continue;
+      const screenMinY = hole.minY + this.wallOffsetY;
+      const screenMaxY = hole.maxY + this.wallOffsetY;
+      if (screenMaxY < -60 || screenMinY > screenHeight + 60) continue;
 
-        theme.drawRectHole(
-          this.holesGraphics,
-          hole.x,
-          screenY,
-          hole.w,
-          hole.h,
-          hole.r
-        );
-      } else {
-        const p1Y = hole.p1.y + this.wallOffsetY;
-        const p2Y = hole.p2.y + this.wallOffsetY;
-        const p3Y = hole.p3.y + this.wallOffsetY;
-
-        const minY = Math.min(p1Y, p2Y, p3Y);
-        const maxY = Math.max(p1Y, p2Y, p3Y);
-        if (maxY < -60 || minY > screenHeight + 60) continue;
-
-        theme.drawTriHole(
-          this.holesGraphics,
-          { x: hole.p1.x, y: p1Y },
-          { x: hole.p2.x, y: p2Y },
-          { x: hole.p3.x, y: p3Y }
-        );
-      }
+      renderHole(this.holesGraphics, theme, hole, this.wallOffsetY);
     }
 
     // 2. Draw Speed Gauge Tick Marks along left and right edges
@@ -473,10 +441,9 @@ export class WallManager extends Phaser.GameObjects.Container {
     const tickSpacing = WALL_CONFIG.tickSpacing;
     const offsetMod = this.wallOffsetY % tickSpacing;
 
-    // Calculate start index for consistent major/minor tick patterns
     const baseTickIndex = Math.floor(this.wallOffsetY / tickSpacing);
-
     const startY = -tickSpacing + offsetMod;
+
     let tickCount = 0;
     for (let y = startY; y <= screenHeight + tickSpacing; y += tickSpacing) {
       const currentTickIdx = baseTickIndex - tickCount;
@@ -498,79 +465,21 @@ export class WallManager extends Phaser.GameObjects.Container {
    */
   public getHoleAt(screenX: number, screenY: number): Hole | null {
     for (const hole of this.holes) {
-      if (hole.type === 'rect') {
-        const hY = hole.y + this.wallOffsetY;
-        if (
-          screenX >= hole.x &&
-          screenX <= hole.x + hole.w &&
-          screenY >= hY &&
-          screenY <= hY + hole.h
-        ) {
-          // Inside rectangle bounding box (with corner radius inset)
-          const r = hole.r;
-          if (
-            (screenX < hole.x + r && screenY < hY + r &&
-              Phaser.Math.Distance.Between(screenX, screenY, hole.x + r, hY + r) > r) ||
-            (screenX > hole.x + hole.w - r && screenY < hY + r &&
-              Phaser.Math.Distance.Between(screenX, screenY, hole.x + hole.w - r, hY + r) > r) ||
-            (screenX < hole.x + r && screenY > hY + hole.h - r &&
-              Phaser.Math.Distance.Between(screenX, screenY, hole.x + r, hY + hole.h - r) > r) ||
-            (screenX > hole.x + hole.w - r && screenY > hY + hole.h - r &&
-              Phaser.Math.Distance.Between(screenX, screenY, hole.x + hole.w - r, hY + hole.h - r) > r)
-          ) {
-            continue; // Inside outer corner deadzone of rounded rectangle
-          }
-          return hole;
-        }
-      } else {
-        // Point in Triangle barycentric test
-        const p1 = { x: hole.p1.x, y: hole.p1.y + this.wallOffsetY };
-        const p2 = { x: hole.p2.x, y: hole.p2.y + this.wallOffsetY };
-        const p3 = { x: hole.p3.x, y: hole.p3.y + this.wallOffsetY };
-
-        if (this.isPointInTriangle(screenX, screenY, p1, p2, p3)) {
-          return hole;
-        }
+      if (isPointInHole(hole, screenX, screenY, this.wallOffsetY)) {
+        return hole;
       }
     }
     return null;
   }
 
   /**
-   * Computes point-in-triangle inclusion using 2D cross-product orientation signs.
-   */
-  private isPointInTriangle(
-    px: number,
-    py: number,
-    a: { x: number; y: number },
-    b: { x: number; y: number },
-    c: { x: number; y: number }
-  ): boolean {
-    const sign1 = (px - b.x) * (a.y - b.y) - (a.x - b.x) * (py - b.y);
-    const sign2 = (px - c.x) * (b.y - c.y) - (b.x - c.x) * (py - c.y);
-    const sign3 = (px - a.x) * (c.y - a.y) - (c.x - a.x) * (py - a.y);
-
-    const hasNeg = sign1 < 0 || sign2 < 0 || sign3 < 0;
-    const hasPos = sign1 > 0 || sign2 > 0 || sign3 > 0;
-
-    return !(hasNeg && hasPos);
-  }
-
-  /**
    * Returns screen coordinates of the geometric center / centroid of a hole.
    */
   public getHoleScreenCenter(hole: Hole): { x: number; y: number } {
-    if (hole.type === 'rect') {
-      return {
-        x: hole.x + hole.w / 2,
-        y: hole.y + this.wallOffsetY + hole.h / 2,
-      };
-    } else {
-      return {
-        x: (hole.p1.x + hole.p2.x + hole.p3.x) / 3,
-        y: (hole.p1.y + hole.p2.y + hole.p3.y) / 3 + this.wallOffsetY,
-      };
-    }
+    return {
+      x: hole.cx,
+      y: hole.cy + this.wallOffsetY,
+    };
   }
 
   public getScrollSpeed(): number {
