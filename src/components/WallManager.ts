@@ -279,109 +279,154 @@ export class WallManager extends Phaser.GameObjects.Container {
 
   /**
    * Places 1 or 2 staggered candidate holes within an available horizontal region.
-   * In wide regions (e.g. >= 220px), holes are placed near the center of the board.
+   * Wide regions are preserved to host giant half-screen spanning obstacles.
    */
   private tryPlaceHoleInRegion(regionMinX: number, regionMaxX: number, baseY: number): boolean {
     const availW = regionMaxX - regionMinX;
     if (availW < 75) return false;
 
-    // In wide regions (>= 220px), place 2 staggered holes with varied Y to pack obstacles
-    const shouldSplit = availW >= 220 && Math.random() < 0.55;
+    // Only split occasionally (20% of the time) when wide so giant half-screen shapes dominate
+    const shouldSplit = availW >= 290 && Math.random() < 0.20;
     if (shouldSplit) {
       const halfW = availW / 2;
       const h1 = this.createCandidateHole(
         regionMinX,
-        regionMinX + halfW - 6,
+        regionMinX + halfW - 10,
         baseY + Phaser.Math.Between(-28, 28)
       );
       const h2 = this.createCandidateHole(
-        regionMinX + halfW + 6,
+        regionMinX + halfW + 10,
         regionMaxX,
         baseY + Phaser.Math.Between(-28, 28)
       );
       return h1 || h2;
     } else {
-      const jitterY = Phaser.Math.Between(-30, 30);
+      const jitterY = Phaser.Math.Between(-25, 25);
       return this.createCandidateHole(regionMinX, regionMaxX, baseY + jitterY);
     }
   }
 
   /**
-   * Creates a randomized candidate hole (long angled rectangle, organic bean, circle, ellipse, or triangle).
+   * Creates a randomized candidate hole supporting giant half-screen obstacles,
+   * organic kidney beans, rotated diagonal ramps, circles, ellipses, and triangles.
    */
   private createCandidateHole(minX: number, maxX: number, targetY: number): boolean {
     const availW = maxX - minX;
     if (availW < 70) return false;
 
-    // Try up to 3 candidate configurations to maximize packing density
-    for (let attempt = 0; attempt < 3; attempt++) {
-      const roll = Math.random();
-      let candidate: Hole | null = null;
+    for (let attempt = 0; attempt < 4; attempt++) {
       const id = `hole_${this.nextHoleId++}`;
+      let candidate: Hole | null = null;
 
-      if (roll < 0.28) {
-        // 1. Long Angled Rectangle / Capsule Slot
+      // When region is wide (>= 220px), prioritize Giant half-screen spanning obstacles
+      const canBeGiant = availW >= 220;
+      const roll = Math.random();
+
+      if (canBeGiant && roll < 0.45) {
+        // 1. GIANT 45-DEGREE RECTANGLE / RAMP (spanning half the screen)
         const length = Phaser.Math.Clamp(
-          Phaser.Math.Between(WALL_CONFIG.rectMinLength, WALL_CONFIG.rectMaxLength),
-          85,
-          availW - 6
+          Phaser.Math.Between(WALL_CONFIG.giantRectMinLength, WALL_CONFIG.giantRectMaxLength),
+          220,
+          Math.min(availW * 1.35, 390)
         );
-        const thickness = Phaser.Math.Between(WALL_CONFIG.rectMinThickness, WALL_CONFIG.rectMaxThickness);
-        const maxAngleRad = Phaser.Math.DegToRad(WALL_CONFIG.rectMaxAngleDeg);
-        const angle = Phaser.Math.FloatBetween(-maxAngleRad, maxAngleRad);
-        const radius = Phaser.Math.Between(10, Math.floor(thickness / 2));
-        const cx = Phaser.Math.Between(minX + length / 2, maxX - length / 2);
+        const thickness = Phaser.Math.Between(
+          WALL_CONFIG.giantRectMinThickness,
+          WALL_CONFIG.giantRectMaxThickness
+        );
+        // Angle at ~45 degrees (+-38 to +-50 deg)
+        const angleSign = Math.random() > 0.5 ? 1 : -1;
+        const angleDeg = angleSign * Phaser.Math.Between(38, 50);
+        const angle = Phaser.Math.DegToRad(angleDeg);
+        const cx = (minX + maxX) / 2 + Phaser.Math.Between(-20, 20);
 
-        candidate = createRectHole(id, cx, targetY, length, thickness, angle, radius);
-      } else if (roll < 0.54) {
-        // 2. Organic Curved Bean / Peanut / Kidney Hole
+        candidate = createRectHole(id, cx, targetY, length, thickness, angle, 18);
+      } else if (canBeGiant && roll < 0.75) {
+        // 2. GIANT ORGANIC CURVED KIDNEY BEAN
         const length = Phaser.Math.Clamp(
-          Phaser.Math.Between(WALL_CONFIG.beanMinLength, WALL_CONFIG.beanMaxLength),
-          80,
-          availW - 6
+          Phaser.Math.Between(WALL_CONFIG.giantBeanMinLength, WALL_CONFIG.giantBeanMaxLength),
+          200,
+          Math.min(availW * 1.25, 370)
         );
-        const r1 = Phaser.Math.Between(WALL_CONFIG.beanMinLobeRadius, WALL_CONFIG.beanMaxLobeRadius);
-        const r2 = Phaser.Math.Between(WALL_CONFIG.beanMinLobeRadius, WALL_CONFIG.beanMaxLobeRadius);
-        const angle = Phaser.Math.FloatBetween(-Phaser.Math.DegToRad(50), Phaser.Math.DegToRad(50));
-        const bendOffset = Phaser.Math.Between(-20, 20);
-        const cx = Phaser.Math.Between(minX + length / 2, maxX - length / 2);
-
-        candidate = createBeanHole(id, cx, targetY, length, r1, r2, angle, bendOffset);
-      } else if (roll < 0.72) {
-        // 3. Rotated Ellipse / Oval
-        const rx = Phaser.Math.Clamp(
-          Phaser.Math.Between(WALL_CONFIG.ellipseMinRx, WALL_CONFIG.ellipseMaxRx),
-          40,
-          availW / 2 - 4
+        const thickness = Phaser.Math.Between(
+          WALL_CONFIG.giantBeanMinThickness,
+          WALL_CONFIG.giantBeanMaxThickness
         );
-        const ry = Phaser.Math.Between(WALL_CONFIG.ellipseMinRy, WALL_CONFIG.ellipseMaxRy);
-        const angle = Phaser.Math.FloatBetween(-Phaser.Math.DegToRad(45), Phaser.Math.DegToRad(45));
-        const cx = Phaser.Math.Between(minX + rx, maxX - rx);
+        const angleDeg = Phaser.Math.Between(-45, 45);
+        const angle = Phaser.Math.DegToRad(angleDeg);
+        const bendOffset = Phaser.Math.Between(-24, 24);
+        const cx = (minX + maxX) / 2 + Phaser.Math.Between(-20, 20);
 
-        candidate = createEllipseHole(id, cx, targetY, rx, ry, angle);
-      } else if (roll < 0.88) {
-        // 4. Stretched & Rotated Triangle
-        const base = Phaser.Math.Clamp(
-          Phaser.Math.Between(WALL_CONFIG.triMinBase, WALL_CONFIG.triMaxBase),
-          75,
-          availW - 6
-        );
-        const height = Phaser.Math.Between(WALL_CONFIG.triMinHeight, WALL_CONFIG.triMaxHeight);
-        const skew = Phaser.Math.FloatBetween(-0.35, 0.35);
-        const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-        const cx = Phaser.Math.Between(minX + base / 2, maxX - base / 2);
-
-        candidate = createTriHole(id, cx, targetY, base, height, skew, angle);
+        candidate = createBeanHole(id, cx, targetY, length, thickness, angle, bendOffset);
       } else {
-        // 5. Circular Pit
-        const radius = Phaser.Math.Clamp(
-          Phaser.Math.Between(WALL_CONFIG.circleMinRadius, WALL_CONFIG.circleMaxRadius),
-          26,
-          availW / 2 - 4
-        );
-        const cx = Phaser.Math.Between(minX + radius, maxX - radius);
+        // 3. MEDIUM & COMPACT VARIETY
+        const subRoll = Math.random();
+        if (subRoll < 0.28) {
+          // Medium Angled Rectangle / Capsule Slot
+          const length = Phaser.Math.Clamp(
+            Phaser.Math.Between(WALL_CONFIG.medRectMinLength, WALL_CONFIG.medRectMaxLength),
+            90,
+            availW - 6
+          );
+          const thickness = Phaser.Math.Between(
+            WALL_CONFIG.medRectMinThickness,
+            WALL_CONFIG.medRectMaxThickness
+          );
+          const angle = Phaser.Math.FloatBetween(-Phaser.Math.DegToRad(50), Phaser.Math.DegToRad(50));
+          const cx = (minX + maxX) / 2 + Phaser.Math.Between(-15, 15);
 
-        candidate = createCircleHole(id, cx, targetY, radius);
+          candidate = createRectHole(id, cx, targetY, length, thickness, angle, 14);
+        } else if (subRoll < 0.52) {
+          // Medium Organic Bean
+          const length = Phaser.Math.Clamp(
+            Phaser.Math.Between(WALL_CONFIG.medBeanMinLength, WALL_CONFIG.medBeanMaxLength),
+            85,
+            availW - 6
+          );
+          const thickness = Phaser.Math.Between(
+            WALL_CONFIG.medBeanMinThickness,
+            WALL_CONFIG.medBeanMaxThickness
+          );
+          const angle = Phaser.Math.FloatBetween(-Phaser.Math.DegToRad(45), Phaser.Math.DegToRad(45));
+          const bendOffset = Phaser.Math.Between(-18, 18);
+          const cx = (minX + maxX) / 2 + Phaser.Math.Between(-15, 15);
+
+          candidate = createBeanHole(id, cx, targetY, length, thickness, angle, bendOffset);
+        } else if (subRoll < 0.72) {
+          // Stretched & Rotated Triangle
+          const base = Phaser.Math.Clamp(
+            Phaser.Math.Between(WALL_CONFIG.triMinBase, WALL_CONFIG.triMaxBase),
+            85,
+            availW - 6
+          );
+          const height = Phaser.Math.Between(WALL_CONFIG.triMinHeight, WALL_CONFIG.triMaxHeight);
+          const skew = Phaser.Math.FloatBetween(-0.35, 0.35);
+          const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+          const cx = (minX + maxX) / 2 + Phaser.Math.Between(-15, 15);
+
+          candidate = createTriHole(id, cx, targetY, base, height, skew, angle);
+        } else if (subRoll < 0.88) {
+          // Rotated Ellipse / Oval
+          const rx = Phaser.Math.Clamp(
+            Phaser.Math.Between(WALL_CONFIG.ellipseMinRx, WALL_CONFIG.ellipseMaxRx),
+            45,
+            availW / 2 - 4
+          );
+          const ry = Phaser.Math.Between(WALL_CONFIG.ellipseMinRy, WALL_CONFIG.ellipseMaxRy);
+          const angle = Phaser.Math.FloatBetween(-Phaser.Math.DegToRad(45), Phaser.Math.DegToRad(45));
+          const cx = (minX + maxX) / 2 + Phaser.Math.Between(-12, 12);
+
+          candidate = createEllipseHole(id, cx, targetY, rx, ry, angle);
+        } else {
+          // Circular Pit (distinct hazard)
+          const radius = Phaser.Math.Clamp(
+            Phaser.Math.Between(WALL_CONFIG.circleMinRadius, WALL_CONFIG.circleMaxRadius),
+            28,
+            availW / 2 - 4
+          );
+          const cx = (minX + maxX) / 2 + Phaser.Math.Between(-12, 12);
+
+          candidate = createCircleHole(id, cx, targetY, radius);
+        }
       }
 
       if (

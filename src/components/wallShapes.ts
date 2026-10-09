@@ -43,8 +43,8 @@ export interface EllipseHole extends BaseHole {
 
 export interface BeanHole extends BaseHole {
   type: 'bean';
-  lobe1: { x: number; y: number; r: number };
-  lobe2: { x: number; y: number; r: number };
+  length: number;
+  thickness: number;
   angle: number;
   polygon: { x: number; y: number }[];
 }
@@ -52,7 +52,8 @@ export interface BeanHole extends BaseHole {
 export type Hole = RectHole | TriHole | CircleHole | EllipseHole | BeanHole;
 
 /**
- * Procedural Factory: Creates a rotated, elongated rounded rectangle / capsule slot.
+ * Procedural Factory: Creates a rotated rounded rectangle / diagonal ramp.
+ * Supports giant sizes (e.g., 280-400px length at 45 degrees spanning half the screen).
  */
 export function createRectHole(
   id: string,
@@ -61,7 +62,7 @@ export function createRectHole(
   w: number,
   h: number,
   angle: number,
-  r: number = 10
+  r: number = 16
 ): RectHole {
   const cosA = Math.cos(angle);
   const sinA = Math.sin(angle);
@@ -69,7 +70,7 @@ export function createRectHole(
   const halfH = h / 2;
   const rad = Math.min(r, halfW - 2, halfH - 2);
 
-  // Generate 16 rounded rectangle boundary points in local coordinates
+  // Generate 16 rounded rectangle boundary points in local coordinates (strict counter-clockwise order)
   const localPts: { x: number; y: number }[] = [];
   const corners = [
     { cx: halfW - rad, cy: halfH - rad, startA: 0 },
@@ -88,7 +89,6 @@ export function createRectHole(
     }
   }
 
-  // Rotate and translate into wall space
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
@@ -242,91 +242,85 @@ export function createEllipseHole(
 }
 
 /**
- * Procedural Factory: Creates an organic curved bean / peanut / kidney hole.
+ * Procedural Factory: Creates an organic, non-polygonal kidney bean / peanut hole.
+ * Uses a smooth parametric spine-normal formulation mathematically guaranteed to never self-intersect.
  */
 export function createBeanHole(
   id: string,
   cx: number,
   cy: number,
   length: number,
-  r1: number,
-  r2: number,
+  thickness: number,
   angle: number,
-  bendOffset: number = 0
+  bendOffset: number = 0,
+  asymmetry: number = 0.16
 ): BeanHole {
+  const halfL = length / 2;
+  const numSteps = 16;
+  const topPts: { x: number; y: number }[] = [];
+  const botPts: { x: number; y: number }[] = [];
+
+  // Spine runs from t = -1 to t = +1 along local X axis with parabolic arch y_spine = bendOffset * (1 - t^2)
+  for (let i = 0; i <= numSteps; i++) {
+    const t = -1 + (2 * i) / numSteps;
+    const xSpine = t * halfL;
+    const ySpine = bendOffset * (1 - t * t);
+
+    // Spine tangent angle derivative dy/dx
+    const slope = halfL !== 0 ? (-2 * bendOffset * t) / halfL : 0;
+    const psi = Math.atan(slope);
+    const normX = -Math.sin(psi);
+    const normY = Math.cos(psi);
+
+    // Smooth thickness envelope tapering to rounded end caps at t = +-1
+    const halfThick =
+      (thickness / 2) * Math.sqrt(Math.max(0, 1 - t * t)) * (1 + asymmetry * t);
+
+    topPts.push({
+      x: xSpine + normX * halfThick,
+      y: ySpine + normY * halfThick,
+    });
+    botPts.push({
+      x: xSpine - normX * halfThick,
+      y: ySpine - normY * halfThick,
+    });
+  }
+
+  // Combine top curve (left to right) and bottom curve (right to left) into a single closed loop
+  const localPolygon: { x: number; y: number }[] = [];
+  for (let i = 0; i < topPts.length; i++) {
+    localPolygon.push(topPts[i]);
+  }
+  for (let i = botPts.length - 1; i >= 0; i--) {
+    localPolygon.push(botPts[i]);
+  }
+
+  // Rotate by angle and translate to (cx, cy)
   const cosA = Math.cos(angle);
   const sinA = Math.sin(angle);
-  const perpX = -sinA;
-  const perpY = cosA;
-
-  const halfL = length / 2;
-  const lobe1 = {
-    x: cx - halfL * cosA,
-    y: cy - halfL * sinA,
-    r: r1,
-  };
-  const lobe2 = {
-    x: cx + halfL * cosA,
-    y: cy + halfL * sinA,
-    r: r2,
-  };
-
-  // Generate smooth contour points around lobe 1, arched waist, and lobe 2
-  const polygon: { x: number; y: number }[] = [];
-  const lobe1Steps = 8;
-  const lobe2Steps = 8;
-
-  // Lobe 1 arc (from angle + PI/2 around the outer cap to angle - PI/2)
-  for (let i = 0; i <= lobe1Steps; i++) {
-    const a = angle + Math.PI / 2 + (i / lobe1Steps) * Math.PI;
-    polygon.push({
-      x: lobe1.x + r1 * Math.cos(a),
-      y: lobe1.y + r1 * Math.sin(a),
-    });
-  }
-
-  // Top arched waist connecting Lobe 1 to Lobe 2
-  const topWaistMid = {
-    x: cx + perpX * (bendOffset + (r1 + r2) * 0.42),
-    y: cy + perpY * (bendOffset + (r1 + r2) * 0.42),
-  };
-  polygon.push(topWaistMid);
-
-  // Lobe 2 arc (outer cap)
-  for (let i = 0; i <= lobe2Steps; i++) {
-    const a = angle - Math.PI / 2 + (i / lobe2Steps) * Math.PI;
-    polygon.push({
-      x: lobe2.x + r2 * Math.cos(a),
-      y: lobe2.y + r2 * Math.sin(a),
-    });
-  }
-
-  // Bottom arched waist connecting Lobe 2 back to Lobe 1
-  const bottomWaistMid = {
-    x: cx + perpX * (bendOffset - (r1 + r2) * 0.42),
-    y: cy + perpY * (bendOffset - (r1 + r2) * 0.42),
-  };
-  polygon.push(bottomWaistMid);
 
   let minX = Infinity;
   let maxX = -Infinity;
   let minY = Infinity;
   let maxY = -Infinity;
 
-  for (const pt of polygon) {
-    minX = Math.min(minX, pt.x);
-    maxX = Math.max(maxX, pt.x);
-    minY = Math.min(minY, pt.y);
-    maxY = Math.max(maxY, pt.y);
-  }
+  const polygon = localPolygon.map((pt) => {
+    const wx = cx + pt.x * cosA - pt.y * sinA;
+    const wy = cy + pt.x * sinA + pt.y * cosA;
+    minX = Math.min(minX, wx);
+    maxX = Math.max(maxX, wx);
+    minY = Math.min(minY, wy);
+    maxY = Math.max(maxY, wy);
+    return { x: wx, y: wy };
+  });
 
   return {
     id,
     type: 'bean',
     cx,
     cy,
-    lobe1,
-    lobe2,
+    length,
+    thickness,
     angle,
     minX,
     maxX,
@@ -403,7 +397,6 @@ export function isPointInHole(
   }
 
   if (hole.type === 'rect') {
-    // Transform to local unrotated space
     const cosA = Math.cos(-hole.angle);
     const sinA = Math.sin(-hole.angle);
     const dx = wx - hole.cx;
@@ -438,15 +431,6 @@ export function isPointInHole(
   }
 
   if (hole.type === 'bean') {
-    // Check if inside either rounded end lobe
-    const d1x = wx - hole.lobe1.x;
-    const d1y = wy - hole.lobe1.y;
-    if (d1x * d1x + d1y * d1y <= hole.lobe1.r * hole.lobe1.r) return true;
-
-    const d2x = wx - hole.lobe2.x;
-    const d2y = wy - hole.lobe2.y;
-    if (d2x * d2x + d2y * d2y <= hole.lobe2.r * hole.lobe2.r) return true;
-
     return isPointInPolygon(wx, wy, hole.polygon);
   }
 
