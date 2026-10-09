@@ -16,48 +16,57 @@ export const WALL_CONFIG = {
   tickRightX: 712, // X origin of right tick gauge
 
   // Continuous Procedural Obstacle Distribution
-  stepMinY: 65, // Vertical advance min step (px)
-  stepMaxY: 100, // Vertical advance max step (px) - spaced for larger, bolder obstacles
-  minHoleGap: 24, // Minimum clearance buffer between distinct holes (px)
-  minSafeCorridorWidth: 115, // Guaranteed safe gap width along every horizontal slice (marble diameter is 50px)
-  corridorAnchorStep: 80, // Vertical distance between smooth corridor control points
-  corridorLeftX: 195, // Safe corridor target center on the left side
-  corridorRightX: 525, // Safe corridor target center on the right side
-  initialBottomRatio: 0.50, // Shapes start halfway down the screen (50% viewport height)
+  stepMinY: 55, // Fine-grained vertical advance for dense obstacles (px)
+  stepMaxY: 85, // Vertical advance max step (px)
+  minHoleGap: 16, // Minimum clearance buffer between distinct holes (px)
+  minSafeCorridorWidth: 68, // Tight safe corridor requiring high player precision (marble diameter is 50px)
+  corridorLeftX: 165, // Safe corridor reaches far left
+  corridorRightX: 555, // Safe corridor reaches far right
+  corridorSwingMinY: 120, // Vertical distance for safe corridor to swing side-to-side (fast, frantic pacing)
+  corridorSwingMaxY: 160,
+  initialBottomRatio: 0.58, // Shapes start at ~58% of screen height (nearer to the bar for immediate action)
 
-  // Giant Half-Screen Spanning Shapes (e.g. 45-degree diagonal barriers)
-  giantRectMinLength: 280,
-  giantRectMaxLength: 390, // Spans half the 720px screen!
-  giantRectMinThickness: 75,
-  giantRectMaxThickness: 110,
-  giantBeanMinLength: 250,
-  giantBeanMaxLength: 370,
-  giantBeanMinThickness: 80,
-  giantBeanMaxThickness: 125,
+  // Giant Half-Screen Spanning Shapes (45-degree diagonal barriers & sharp wedges)
+  giantRectMinLength: 260,
+  giantRectMaxLength: 380, // Spans half the 720px screen!
+  giantRectMinThickness: 70,
+  giantRectMaxThickness: 105,
 
-  // Medium Shapes
-  medRectMinLength: 160,
-  medRectMaxLength: 240,
-  medRectMinThickness: 60,
-  medRectMaxThickness: 90,
-  medBeanMinLength: 150,
-  medBeanMaxLength: 220,
-  medBeanMinThickness: 65,
-  medBeanMaxThickness: 95,
+  // Giant & Medium Sharp Triangles / Wedges
+  giantTriMinBase: 190,
+  giantTriMaxBase: 310,
+  giantTriMinHeight: 140,
+  giantTriMaxHeight: 230,
+  medTriMinBase: 110,
+  medTriMaxBase: 190,
+  medTriMinHeight: 90,
+  medTriMaxHeight: 160,
 
-  // Stretched & Rotated Triangles
-  triMinBase: 110,
-  triMaxBase: 230,
-  triMinHeight: 95,
-  triMaxHeight: 185,
+  // Giant & Medium Ellipses / Ovals
+  giantEllipseMinRx: 95,
+  giantEllipseMaxRx: 140,
+  giantEllipseMinRy: 48,
+  giantEllipseMaxRy: 75,
+  medEllipseMinRx: 55,
+  medEllipseMaxRx: 90,
+  medEllipseMinRy: 35,
+  medEllipseMaxRy: 55,
 
-  // Non-Polygonal Shapes: Circles & Ellipses
-  circleMinRadius: 32,
-  circleMaxRadius: 55, // Clean circular pits (diameter 64-110px)
-  ellipseMinRx: 70,
-  ellipseMaxRx: 125,
-  ellipseMinRy: 45,
-  ellipseMaxRy: 75,
+  // Medium Rectangles
+  medRectMinLength: 140,
+  medRectMaxLength: 220,
+  medRectMinThickness: 55,
+  medRectMaxThickness: 80,
+
+  // Organic Kidney Beans (tuned to be a balanced accent, not dominant)
+  beanMinLength: 160,
+  beanMaxLength: 260,
+  beanMinThickness: 60,
+  beanMaxThickness: 85,
+
+  // Non-Polygonal Shapes: Circular Pits
+  circleMinRadius: 30,
+  circleMaxRadius: 52, // Clean circular pits (diameter 60-104px)
 
   // Playable Boundaries within the 720px viewport
   playableMarginLeft: 45,
