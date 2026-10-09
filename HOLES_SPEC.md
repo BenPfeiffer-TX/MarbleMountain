@@ -21,23 +21,29 @@ This document specifies the exact geometry, procedural generation rules, physics
 
 ### Hole Geometries
 1. **Rectangles**:
-   - Width: $110\text{px} - 220\text{px}$
-   - Height: $75\text{px} - 135\text{px}$
+   - Width: $90\text{px} - 180\text{px}$
+   - Height: $70\text{px} - 125\text{px}$
    - Corner Radius: $10\text{px}$
 2. **Triangles**:
-   - Base: $110\text{px} - 195\text{px}$
-   - Height: $90\text{px} - 145\text{px}$
+   - Base: $95\text{px} - 175\text{px}$
+   - Height: $75\text{px} - 130\text{px}$
    - Orientation: Upright ($\Delta$) or Inverted ($\nabla$).
 
 ---
 
-## 3. Mathematical Solvability Invariant
+## 3. Mathematical Solvability Invariant & Continuous Distribution
 Let $X \in [X_{\text{min}}, X_{\text{max}}] = [45, 675]$ be the playable horizontal range.
 For any vertical coordinate $y$:
 $$\text{FreeSpace}(y) = [X_{\text{min}}, X_{\text{max}}] \setminus \bigcup_{i} \text{Hole}_i(y)$$
 The generation algorithm guarantees:
-$$\max_{\text{interval} \subset \text{FreeSpace}(y)} \text{width}(\text{interval}) \ge W_{\text{safe}} \quad (W_{\text{safe}} = 120\text{px} > 2.4R)$$
-This is achieved by dividing vertical generation into bands ($H_{\text{band}} = 220\text{px}$, separated by $70\text{px}$ maneuvering gaps). In each band, a designated safe corridor $[S_{\text{start}}, S_{\text{end}}]$ with width $\ge 120\text{px}$ is explicitly reserved before procedural placement of holes in the remaining spaces. Consecutive corridors shift by at most $170\text{px}$, ensuring smooth navigateable paths.
+$$\max_{\text{interval} \subset \text{FreeSpace}(y)} \text{width}(\text{interval}) \ge W_{\text{safe}} \quad (W_{\text{safe}} = 115\text{px} > 2.3R)$$
+
+### Continuous Meandering Corridor Architecture
+Instead of discrete horizontal bands/rows, obstacles are continuously and organically distributed across the mountain wall:
+1. **Smoothstep Spine**: Control anchors are spaced every $90\text{px}$ of $Y$ with drift $\le 95\text{px}$. The corridor center $X_{\text{safe}}(y)$ is evaluated continuously via smoothstep $s(t) = 3t^2 - 2t^3$.
+2. **Continuous Envelope Reservation**: For any obstacle spanning $[y_1, y_2]$, the corridor envelope $[\min S_{\text{left}}, \max S_{\text{right}}]$ with buffer $14\text{px}$ is strictly reserved.
+3. **Organic Jittered Spacing**: Generation advances upward in fine-grained steps ($\Delta Y = 48\text{--}70\text{px}$) with random vertical jitter ($\pm 30\text{px}$) on each candidate, breaking any perceived horizontal lines or rows.
+4. **Collision Packing**: Adjacent holes maintain a minimum clearance gap ($20\text{px}$) to keep their thick wooden borders distinct, producing a dense, natural obstacle course of $14\text{--}20$ holes on screen simultaneously.
 
 ---
 

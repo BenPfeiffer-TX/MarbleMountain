@@ -40,7 +40,7 @@ export class WallManager extends Phaser.GameObjects.Container {
   private isScrolling: boolean = false;
   private wallOffsetY: number = 0; // Cumulative vertical scroll offset
   private highestGeneratedY: number = 0; // Top-most generated wall Y coordinate
-  private lastSafeCorridorX: number = 360; // Center of safe corridor of previous band
+  private corridorAnchors: { y: number; x: number }[] = []; // Smooth meandering corridor control points
 
   private holes: Hole[] = [];
   private unsubscribeTheme?: () => void;
@@ -77,20 +77,18 @@ export class WallManager extends Phaser.GameObjects.Container {
 
   /**
    * Starts downward wall progression.
-   * Generates shapes starting halfway down the screen so the player has immediate obstacles in sight,
-   * continuing seamlessly upward past the top of the viewport.
+   * Generates a dense, organic obstacle field starting halfway down the screen.
    */
   public startSpawning(): void {
     if (this.isScrolling) return;
     this.isScrolling = true;
 
-    // First pattern appears halfway down the screen (50% viewport height) moving downward
     if (this.holes.length === 0) {
       const h = this.scene.scale.height;
       this.highestGeneratedY = h * (WALL_CONFIG.initialBottomRatio ?? 0.50);
-      this.lastSafeCorridorX = (WALL_CONFIG.playableMarginLeft + WALL_CONFIG.playableMarginRight) / 2;
-      // Pre-generate initial bands from halfway down the screen upward past the top of viewport
-      this.generateBandsUpTo(-WALL_CONFIG.bandHeight * 2);
+      this.corridorAnchors = [];
+      // Pre-generate dense continuous obstacle field upward past the top of viewport
+      this.generateUpTo(-400);
       this.renderAll(h);
     }
   }
@@ -109,145 +107,295 @@ export class WallManager extends Phaser.GameObjects.Container {
     this.isScrolling = false;
     this.wallOffsetY = 0;
     this.highestGeneratedY = 0;
-    this.lastSafeCorridorX = (WALL_CONFIG.playableMarginLeft + WALL_CONFIG.playableMarginRight) / 2;
+    this.corridorAnchors = [];
     this.holes = [];
     this.holesGraphics.clear();
     this.ticksGraphics.clear();
   }
 
   /**
-   * Procedural Generation: Generates bands upward until reaching targetTopY.
+   * Continuous Procedural Generator:
+   * Advances upward in fine-grained, jittered vertical steps to create a dense,
+   * organic, non-linear scattering of triangular and rectangular holes.
    */
-  private generateBandsUpTo(targetTopY: number): void {
+  private generateUpTo(targetTopY: number): void {
+    this.ensureCorridorAnchorsUpTo(targetTopY - 250);
+
     while (this.highestGeneratedY > targetTopY) {
-      const bandTopY = this.highestGeneratedY - WALL_CONFIG.bandHeight;
-      this.generateBand(bandTopY, WALL_CONFIG.bandHeight);
-      this.highestGeneratedY = bandTopY - WALL_CONFIG.bandGap;
+      const stepY = Phaser.Math.Between(WALL_CONFIG.stepMinY, WALL_CONFIG.stepMaxY);
+      this.highestGeneratedY -= stepY;
+      this.generateStepAtY(this.highestGeneratedY);
     }
   }
 
   /**
-   * Generates a single horizontal band of procedural holes with guaranteed solvability.
+   * Ensures smooth corridor anchor points exist up to targetTopY.
    */
-  private generateBand(bandTopY: number, bandH: number): void {
-    const minX = WALL_CONFIG.playableMarginLeft;
-    const maxX = WALL_CONFIG.playableMarginRight;
-    const safeW = WALL_CONFIG.minSafeCorridorWidth;
+  private ensureCorridorAnchorsUpTo(targetTopY: number): void {
+    const minCenter = WALL_CONFIG.playableMarginLeft + WALL_CONFIG.minSafeCorridorWidth / 2 + 15;
+    const maxCenter = WALL_CONFIG.playableMarginRight - WALL_CONFIG.minSafeCorridorWidth / 2 - 15;
 
-    // 1. Choose safe corridor position, smoothly constrained to avoid sudden huge jumps
-    const maxShift = WALL_CONFIG.maxSafeCorridorShift;
-    const minCenter = minX + safeW / 2;
-    const maxCenter = maxX - safeW / 2;
-
-    const shiftedMin = Math.max(minCenter, this.lastSafeCorridorX - maxShift);
-    const shiftedMax = Math.min(maxCenter, this.lastSafeCorridorX + maxShift);
-    const safeCenterX = Phaser.Math.Between(Math.floor(shiftedMin), Math.floor(shiftedMax));
-    this.lastSafeCorridorX = safeCenterX;
-
-    const safeLeft = safeCenterX - safeW / 2;
-    const safeRight = safeCenterX + safeW / 2;
-
-    // 2. Left Region: [minX, safeLeft - 18]
-    const leftRegionW = (safeLeft - 18) - minX;
-    if (leftRegionW >= 70) {
-      this.populateRegionHoles(minX, safeLeft - 18, bandTopY, bandH);
+    if (this.corridorAnchors.length === 0) {
+      const initialY = this.highestGeneratedY + 120;
+      const initialX = (minCenter + maxCenter) / 2;
+      this.corridorAnchors.push({ y: initialY, x: initialX });
     }
 
-    // 3. Right Region: [safeRight + 18, maxX]
-    const rightRegionW = maxX - (safeRight + 18);
-    if (rightRegionW >= 70) {
-      this.populateRegionHoles(safeRight + 18, maxX, bandTopY, bandH);
+    while (this.corridorAnchors[this.corridorAnchors.length - 1].y > targetTopY) {
+      const last = this.corridorAnchors[this.corridorAnchors.length - 1];
+      const nextY = last.y - WALL_CONFIG.corridorAnchorStep;
+      const shift = Phaser.Math.Between(
+        -WALL_CONFIG.maxCorridorShiftPerAnchor,
+        WALL_CONFIG.maxCorridorShiftPerAnchor
+      );
+      const nextX = Phaser.Math.Clamp(last.x + shift, minCenter, maxCenter);
+      this.corridorAnchors.push({ y: nextY, x: nextX });
     }
   }
 
   /**
-   * Places 1 or 2 procedural holes (rectangle or triangle) within a bounded region.
+   * Computes the exact center of the safe corridor at vertical coordinate Y using smoothstep.
    */
-  private populateRegionHoles(
-    regionLeft: number,
-    regionRight: number,
-    bandTopY: number,
-    bandH: number
-  ): void {
-    const regionW = regionRight - regionLeft;
-    // If region is wide (> 320px), place up to 2 holes; otherwise place 1 big hole
-    const holeCount = regionW > 320 && Math.random() > 0.45 ? 2 : 1;
+  private getSafeCorridorCenterX(y: number): number {
+    if (this.corridorAnchors.length === 0) {
+      return (WALL_CONFIG.playableMarginLeft + WALL_CONFIG.playableMarginRight) / 2;
+    }
+    if (y >= this.corridorAnchors[0].y) {
+      return this.corridorAnchors[0].x;
+    }
+    if (y <= this.corridorAnchors[this.corridorAnchors.length - 1].y) {
+      return this.corridorAnchors[this.corridorAnchors.length - 1].x;
+    }
 
-    const slotW = regionW / holeCount;
-    for (let i = 0; i < holeCount; i++) {
-      const slotLeft = regionLeft + i * slotW + 8;
-      const slotRight = regionLeft + (i + 1) * slotW - 8;
-      const availableW = slotRight - slotLeft;
-
-      if (availableW < 70) continue;
-
-      const isTriangle = Math.random() > 0.5;
-      const maxHoleH = Math.max(WALL_CONFIG.rectMinHeight, bandH - 30);
-      const holeY = bandTopY + Phaser.Math.Between(10, Math.max(12, bandH - maxHoleH));
-
-      if (isTriangle) {
-        // Procedural Triangle Hole (bigger size)
-        const baseW = Phaser.Math.Clamp(
-          Phaser.Math.Between(WALL_CONFIG.triMinBase, WALL_CONFIG.triMaxBase),
-          70,
-          availableW
-        );
-        const triH = Phaser.Math.Clamp(
-          Phaser.Math.Between(WALL_CONFIG.triMinHeight, WALL_CONFIG.triMaxHeight),
-          70,
-          maxHoleH
-        );
-        const startX = Phaser.Math.Between(slotLeft, slotRight - baseW);
-        const isInverted = Math.random() > 0.5;
-
-        let p1: { x: number; y: number };
-        let p2: { x: number; y: number };
-        let p3: { x: number; y: number };
-
-        if (!isInverted) {
-          // Upright Triangle (Apex at top center)
-          p1 = { x: startX + baseW / 2, y: holeY };
-          p2 = { x: startX, y: holeY + triH };
-          p3 = { x: startX + baseW, y: holeY + triH };
-        } else {
-          // Inverted Triangle (Apex pointing downward)
-          p1 = { x: startX, y: holeY };
-          p2 = { x: startX + baseW, y: holeY };
-          p3 = { x: startX + baseW / 2, y: holeY + triH };
-        }
-
-        this.holes.push({
-          type: 'tri',
-          id: `hole_${this.nextHoleId++}`,
-          p1,
-          p2,
-          p3,
-        });
-      } else {
-        // Procedural Rectangle Hole (bigger size)
-        const rectW = Phaser.Math.Clamp(
-          Phaser.Math.Between(WALL_CONFIG.rectMinWidth, WALL_CONFIG.rectMaxWidth),
-          70,
-          availableW
-        );
-        const rectH = Phaser.Math.Clamp(
-          Phaser.Math.Between(WALL_CONFIG.rectMinHeight, WALL_CONFIG.rectMaxHeight),
-          60,
-          maxHoleH
-        );
-        const rectX = Phaser.Math.Between(slotLeft, slotRight - rectW);
-
-        this.holes.push({
-          type: 'rect',
-          id: `hole_${this.nextHoleId++}`,
-          x: rectX,
-          y: holeY,
-          w: rectW,
-          h: rectH,
-          r: WALL_CONFIG.rectCornerRadius,
-        });
+    for (let i = 0; i < this.corridorAnchors.length - 1; i++) {
+      const a0 = this.corridorAnchors[i];
+      const a1 = this.corridorAnchors[i + 1];
+      if (y <= a0.y && y >= a1.y) {
+        const t = (a0.y - y) / (a0.y - a1.y);
+        const smoothT = t * t * (3 - 2 * t);
+        return a0.x + (a1.x - a0.x) * smoothT;
       }
     }
+    return this.corridorAnchors[this.corridorAnchors.length - 1].x;
+  }
+
+  /**
+   * Returns the extreme envelope of the safe corridor across vertical span [yTop, yBottom].
+   */
+  private getSafeCorridorSpan(yTop: number, yBottom: number): { minLeft: number; maxRight: number } {
+    const halfW = WALL_CONFIG.minSafeCorridorWidth / 2;
+    let minLeft = Infinity;
+    let maxRight = -Infinity;
+
+    const step = 20;
+    for (let y = yTop; y <= yBottom; y += step) {
+      const cx = this.getSafeCorridorCenterX(y);
+      minLeft = Math.min(minLeft, cx - halfW);
+      maxRight = Math.max(maxRight, cx + halfW);
+    }
+    const cxBottom = this.getSafeCorridorCenterX(yBottom);
+    minLeft = Math.min(minLeft, cxBottom - halfW);
+    maxRight = Math.max(maxRight, cxBottom + halfW);
+
+    return { minLeft, maxRight };
+  }
+
+  /**
+   * Mathematical Solvability Invariant:
+   * Verifies that the candidate hole does not encroach into the guaranteed safe corridor.
+   */
+  private isHoleSafeFromCorridor(x1: number, x2: number, y1: number, y2: number): boolean {
+    const { minLeft, maxRight } = this.getSafeCorridorSpan(y1, y2);
+    const margin = 14;
+    return x2 <= minLeft - margin || x1 >= maxRight + margin;
+  }
+
+  /**
+   * Minimum Separation Check:
+   * Ensures holes do not awkwardly overlap one another, keeping their wooden borders crisp.
+   */
+  private doesHoleOverlapExisting(x1: number, x2: number, y1: number, y2: number): boolean {
+    const gap = WALL_CONFIG.minHoleGap;
+    const expX1 = x1 - gap;
+    const expX2 = x2 + gap;
+    const expY1 = y1 - gap;
+    const expY2 = y2 + gap;
+
+    for (const h of this.holes) {
+      let hx1: number, hx2: number, hy1: number, hy2: number;
+      if (h.type === 'rect') {
+        hx1 = h.x;
+        hx2 = h.x + h.w;
+        hy1 = h.y;
+        hy2 = h.y + h.h;
+      } else {
+        hx1 = Math.min(h.p1.x, h.p2.x, h.p3.x);
+        hx2 = Math.max(h.p1.x, h.p2.x, h.p3.x);
+        hy1 = Math.min(h.p1.y, h.p2.y, h.p3.y);
+        hy2 = Math.max(h.p1.y, h.p2.y, h.p3.y);
+      }
+
+      if (hy2 < expY1 || hy1 > expY2) continue;
+      if (expX1 < hx2 && expX2 > hx1 && expY1 < hy2 && expY2 > hy1) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /**
+   * Generates candidates across the horizontal slice at baseY.
+   */
+  private generateStepAtY(baseY: number): void {
+    const minX = WALL_CONFIG.playableMarginLeft;
+    const maxX = WALL_CONFIG.playableMarginRight;
+    const safe = this.getSafeCorridorSpan(baseY - 70, baseY + 70);
+
+    const leftMaxX = safe.minLeft - 14;
+    const rightMinX = safe.maxRight + 14;
+
+    const leftW = leftMaxX - minX;
+    const rightW = maxX - rightMinX;
+
+    const canLeft = leftW >= 80;
+    const canRight = rightW >= 80;
+
+    // High attempt probability (85%) ensures rich obstacle density
+    let tryLeft = canLeft && Math.random() < 0.85;
+    let tryRight = canRight && Math.random() < 0.85;
+
+    // Guarantee at least one side is attempted to prevent empty gaps
+    if (!tryLeft && !tryRight) {
+      if (canLeft && (!canRight || leftW >= rightW)) {
+        tryLeft = true;
+      } else if (canRight) {
+        tryRight = true;
+      }
+    }
+
+    if (tryLeft) {
+      this.tryPlaceHoleInRegion(minX, leftMaxX, baseY);
+    }
+    if (tryRight) {
+      this.tryPlaceHoleInRegion(rightMinX, maxX, baseY);
+    }
+  }
+
+  /**
+   * Places 1 or 2 staggered candidate holes within an available horizontal region.
+   */
+  private tryPlaceHoleInRegion(regionMinX: number, regionMaxX: number, baseY: number): boolean {
+    const availW = regionMaxX - regionMinX;
+    if (availW < 75) return false;
+
+    // If region is wide (>= 230px), place 2 staggered holes with varied Y
+    const shouldSplit = availW >= 230 && Math.random() < 0.50;
+    if (shouldSplit) {
+      const halfW = availW / 2;
+      const h1 = this.createCandidateHole(
+        regionMinX,
+        regionMinX + halfW - 8,
+        baseY + Phaser.Math.Between(-28, 28)
+      );
+      const h2 = this.createCandidateHole(
+        regionMinX + halfW + 8,
+        regionMaxX,
+        baseY + Phaser.Math.Between(-28, 28)
+      );
+      return h1 || h2;
+    } else {
+      const jitterY = Phaser.Math.Between(-30, 30);
+      return this.createCandidateHole(regionMinX, regionMaxX, baseY + jitterY);
+    }
+  }
+
+  /**
+   * Attempts to generate a single hole (rectangle or triangle) within [minX, maxX] at targetY.
+   */
+  private createCandidateHole(minX: number, maxX: number, targetY: number): boolean {
+    const availW = maxX - minX;
+    if (availW < 75) return false;
+
+    const isTriangle = Math.random() > 0.48;
+
+    for (let attempt = 0; attempt < 3; attempt++) {
+      if (isTriangle) {
+        const baseW = Phaser.Math.Clamp(
+          Phaser.Math.Between(WALL_CONFIG.triMinBase, WALL_CONFIG.triMaxBase),
+          75,
+          availW - 4
+        );
+        const triH = Phaser.Math.Between(WALL_CONFIG.triMinHeight, WALL_CONFIG.triMaxHeight);
+        const maxStartX = maxX - baseW - 2;
+        const minStartX = minX + 2;
+        if (maxStartX < minStartX) continue;
+
+        const startX = Phaser.Math.Between(minStartX, maxStartX);
+        const isInverted = Math.random() > 0.5;
+
+        const p1 = isInverted
+          ? { x: startX, y: targetY }
+          : { x: startX + baseW / 2, y: targetY };
+        const p2 = isInverted
+          ? { x: startX + baseW, y: targetY }
+          : { x: startX, y: targetY + triH };
+        const p3 = isInverted
+          ? { x: startX + baseW / 2, y: targetY + triH }
+          : { x: startX + baseW, y: targetY + triH };
+
+        const x1 = startX;
+        const x2 = startX + baseW;
+        const y1 = targetY;
+        const y2 = targetY + triH;
+
+        if (
+          this.isHoleSafeFromCorridor(x1, x2, y1, y2) &&
+          !this.doesHoleOverlapExisting(x1, x2, y1, y2)
+        ) {
+          this.holes.push({
+            type: 'tri',
+            id: `hole_${this.nextHoleId++}`,
+            p1,
+            p2,
+            p3,
+          });
+          return true;
+        }
+      } else {
+        const rectW = Phaser.Math.Clamp(
+          Phaser.Math.Between(WALL_CONFIG.rectMinWidth, WALL_CONFIG.rectMaxWidth),
+          75,
+          availW - 4
+        );
+        const rectH = Phaser.Math.Between(WALL_CONFIG.rectMinHeight, WALL_CONFIG.rectMaxHeight);
+        const maxStartX = maxX - rectW - 2;
+        const minStartX = minX + 2;
+        if (maxStartX < minStartX) continue;
+
+        const rectX = Phaser.Math.Between(minStartX, maxStartX);
+        const x1 = rectX;
+        const x2 = rectX + rectW;
+        const y1 = targetY;
+        const y2 = targetY + rectH;
+
+        if (
+          this.isHoleSafeFromCorridor(x1, x2, y1, y2) &&
+          !this.doesHoleOverlapExisting(x1, x2, y1, y2)
+        ) {
+          this.holes.push({
+            type: 'rect',
+            id: `hole_${this.nextHoleId++}`,
+            x: rectX,
+            y: targetY,
+            w: rectW,
+            h: rectH,
+            r: WALL_CONFIG.rectCornerRadius,
+          });
+          return true;
+        }
+      }
+    }
+    return false;
   }
 
   /**
@@ -257,9 +405,9 @@ export class WallManager extends Phaser.GameObjects.Container {
     if (this.isScrolling) {
       this.wallOffsetY += WALL_CONFIG.scrollSpeed * dt;
 
-      // Generate new bands ahead above the viewport
+      // Generate new obstacles ahead above the viewport
       const screenTopInWallSpace = -this.wallOffsetY;
-      this.generateBandsUpTo(screenTopInWallSpace - WALL_CONFIG.bandHeight * 2);
+      this.generateUpTo(screenTopInWallSpace - 400);
 
       // Cull holes that have scrolled past the bottom of the screen
       const screenBottomInWallSpace = screenHeight - this.wallOffsetY + 150;
@@ -270,6 +418,11 @@ export class WallManager extends Phaser.GameObjects.Container {
           return Math.min(h.p1.y, h.p2.y, h.p3.y) <= screenBottomInWallSpace;
         }
       });
+
+      // Cull old corridor anchors far below the screen
+      this.corridorAnchors = this.corridorAnchors.filter(
+        (a) => a.y <= screenBottomInWallSpace + 300
+      );
     }
 
     this.renderAll(screenHeight);
