@@ -248,7 +248,7 @@ export const classicWoodHoleTheme: HoleTheme = {
   id: 'classicWoodHole',
   name: 'Classic Wood Hole',
   borderColor: 0x9c6638,
-  borderWidth: 2.5,
+  borderWidth: 4.5,
   innerShadowColor: 0x000000,
   tickColor: 0x8b6544,
 
@@ -258,23 +258,30 @@ export const classicWoodHoleTheme: HoleTheme = {
     y: number,
     width: number,
     height: number,
-    cornerRadius: number = 8
+    cornerRadius: number = 10
   ): void {
     // 1. Deep pitch black pit interior
     g.fillStyle(0x050507, 1.0);
     g.fillRoundedRect(x, y, width, height, cornerRadius);
 
-    // 2. Soft inner shadow at top-left rim (simulates wall depth)
-    g.fillStyle(0x000000, 0.40);
-    g.fillRoundedRect(x + 1.5, y + 1.5, width - 3, Math.min(10, height * 0.25), Math.max(2, cornerRadius - 2));
+    // 2. Soft inner ambient occlusion shadow along top-left rim (simulates carved wall depth)
+    g.fillStyle(0x000000, 0.45);
+    g.fillRoundedRect(x + 2.5, y + 2.5, width - 5, Math.min(14, height * 0.28), Math.max(2, cornerRadius - 2));
 
-    // 3. Thin warm wood border matching the bar and buttons
-    g.lineStyle(2.5, 0x9c6638, 1.0);
+    // 3. Thick warm wood border matching the bar and buttons
+    g.lineStyle(4.5, 0x9c6638, 1.0);
     g.strokeRoundedRect(x, y, width, height, cornerRadius);
 
-    // 4. Subtle outer dark bevel line for crisp tactile contrast against background
-    g.lineStyle(1.0, 0x5a3617, 0.45);
-    g.strokeRoundedRect(x - 0.5, y - 0.5, width + 1, height + 1, cornerRadius + 0.5);
+    // 4. Outer dark contour bevel for tactile 3D punch against the background
+    g.lineStyle(1.5, 0x5a3617, 0.55);
+    g.strokeRoundedRect(x - 1, y - 1, width + 2, height + 2, cornerRadius + 1);
+
+    // 5. Subtle top-edge lighter highlight for 3D wood bevel effect
+    g.lineStyle(1.5, 0xb57c4c, 0.65);
+    g.beginPath();
+    g.moveTo(x + cornerRadius, y);
+    g.lineTo(x + width - cornerRadius, y);
+    g.strokePath();
   },
 
   drawTriHole(
@@ -292,8 +299,8 @@ export const classicWoodHoleTheme: HoleTheme = {
     g.closePath();
     g.fillPath();
 
-    // 2. Thin warm wood border matching the bar and buttons
-    g.lineStyle(2.5, 0x9c6638, 1.0);
+    // 2. Thick warm wood border matching the bar and buttons
+    g.lineStyle(4.5, 0x9c6638, 1.0);
     g.beginPath();
     g.moveTo(p1.x, p1.y);
     g.lineTo(p2.x, p2.y);
@@ -301,8 +308,8 @@ export const classicWoodHoleTheme: HoleTheme = {
     g.closePath();
     g.strokePath();
 
-    // 3. Subtle dark contour bevel
-    g.lineStyle(1.0, 0x5a3617, 0.45);
+    // 3. Outer dark contour bevel
+    g.lineStyle(1.5, 0x5a3617, 0.55);
     g.strokePath();
   },
 
@@ -315,8 +322,8 @@ export const classicWoodHoleTheme: HoleTheme = {
     isMajor: boolean
   ): void {
     const endX = x + length * direction;
-    const alpha = isMajor ? 0.65 : 0.35;
-    const width = isMajor ? 2.5 : 1.5;
+    const alpha = isMajor ? 0.70 : 0.40;
+    const width = isMajor ? 3.0 : 1.8;
 
     g.lineStyle(width, 0x8b6544, alpha);
     g.lineBetween(x, y, endX, y);

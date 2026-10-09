@@ -16,22 +16,23 @@ export const WALL_CONFIG = {
   tickRightX: 712, // X origin of right tick gauge
 
   // Procedural Band Generation
-  bandHeight: 160, // Height of each procedural hole row band in px
-  bandGap: 60, // Clear vertical gap between bands for player maneuvering
-  minSafeCorridorWidth: 110, // Guaranteed safe gap width along every horizontal slice (marble diameter is 50px)
-  maxSafeCorridorShift: 160, // Maximum horizontal shift of safe corridor between adjacent bands
+  bandHeight: 220, // Height of each procedural hole row band in px (increased for larger shapes)
+  bandGap: 70, // Clear vertical gap between bands for player maneuvering
+  minSafeCorridorWidth: 120, // Guaranteed safe gap width along every horizontal slice (marble diameter is 50px)
+  maxSafeCorridorShift: 170, // Maximum horizontal shift of safe corridor between adjacent bands
+  initialBottomRatio: 0.50, // Shapes start halfway down the screen (50% viewport height)
 
-  // Hole Dimensions
-  rectMinWidth: 75,
-  rectMaxWidth: 150,
-  rectMinHeight: 55,
-  rectMaxHeight: 90,
-  rectCornerRadius: 8,
+  // Hole Dimensions (Bigger shapes for prominent obstacles)
+  rectMinWidth: 110,
+  rectMaxWidth: 220,
+  rectMinHeight: 75,
+  rectMaxHeight: 135,
+  rectCornerRadius: 10,
 
-  triMinBase: 80,
-  triMaxBase: 130,
-  triMinHeight: 65,
-  triMaxHeight: 95,
+  triMinBase: 110,
+  triMaxBase: 195,
+  triMinHeight: 90,
+  triMaxHeight: 145,
 
   // Playable Boundaries within the 720px viewport
   playableMarginLeft: 45,
@@ -40,5 +41,5 @@ export const WALL_CONFIG = {
   // Visual Appearance
   holeBgColor: 0x050507, // Deep pitch black interior
   holeInnerShadowAlpha: 0.45, // Soft ambient occlusion along top-left inner rim
-  borderWidth: 2.5, // Thin theme border width
+  borderWidth: 4.5, // Thicker theme border width (increased from 2.5)
 };

@@ -8,7 +8,7 @@ This document specifies the exact geometry, procedural generation rules, physics
 - **Core Obstacle**: The mountain wall behind the bar contains deep holes (receding pits) that scroll slowly downward toward the player.
 - **Procedural Shapes**: Holes consist of procedurally generated rectangles and triangles.
 - **Solvability Invariant**: Every horizontal slice across the playable wall width is mathematically guaranteed to contain at least one safe passage corridor ($W_{\text{safe}} \ge 110\text{px}$, well exceeding the $50\text{px}$ marble diameter) where the marble can rest without falling through.
-- **Emergence Timing**: Hole patterns begin emerging at the top of the screen ($Y \le 0$) as soon as the marble completes its arrival bounce sequence and settles into active rolling.
+- **Emergence Timing & Position**: Hole patterns populate the mountain wall starting halfway down the screen ($Y \approx 640\text{px}$, 50% viewport height) and scroll continuously downward right from the start of the game, eliminating empty waiting time.
 - **Lose Condition**: If the marble center passes over the surface of any hole, the marble falls into the pit (scaling down and shading into the dark void), triggering Game Over.
 - **Speed Gauge (Tick Marks)**: Altitude notches / tick marks along the left and right edges scroll synchronously with the wall, calibrated so exactly one tick mark passes the bar every second.
 
@@ -21,12 +21,12 @@ This document specifies the exact geometry, procedural generation rules, physics
 
 ### Hole Geometries
 1. **Rectangles**:
-   - Width: $70\text{px} - 150\text{px}$
-   - Height: $50\text{px} - 90\text{px}$
-   - Corner Radius: $8\text{px}$
+   - Width: $110\text{px} - 220\text{px}$
+   - Height: $75\text{px} - 135\text{px}$
+   - Corner Radius: $10\text{px}$
 2. **Triangles**:
-   - Base: $80\text{px} - 130\text{px}$
-   - Height: $65\text{px} - 95\text{px}$
+   - Base: $110\text{px} - 195\text{px}$
+   - Height: $90\text{px} - 145\text{px}$
    - Orientation: Upright ($\Delta$) or Inverted ($\nabla$).
 
 ---
@@ -36,15 +36,15 @@ Let $X \in [X_{\text{min}}, X_{\text{max}}] = [45, 675]$ be the playable horizon
 For any vertical coordinate $y$:
 $$\text{FreeSpace}(y) = [X_{\text{min}}, X_{\text{max}}] \setminus \bigcup_{i} \text{Hole}_i(y)$$
 The generation algorithm guarantees:
-$$\max_{\text{interval} \subset \text{FreeSpace}(y)} \text{width}(\text{interval}) \ge W_{\text{safe}} \quad (W_{\text{safe}} = 110\text{px} > 2R)$$
-This is achieved by dividing vertical generation into bands ($H_{\text{band}} = 160\text{px}$, separated by $60\text{px}$ maneuvering gaps). In each band, a designated safe corridor $[S_{\text{start}}, S_{\text{end}}]$ with width $\ge 110\text{px}$ is explicitly reserved before procedural placement of holes in the remaining spaces. Consecutive corridors shift by at most $160\text{px}$, ensuring smooth navigateable paths.
+$$\max_{\text{interval} \subset \text{FreeSpace}(y)} \text{width}(\text{interval}) \ge W_{\text{safe}} \quad (W_{\text{safe}} = 120\text{px} > 2.4R)$$
+This is achieved by dividing vertical generation into bands ($H_{\text{band}} = 220\text{px}$, separated by $70\text{px}$ maneuvering gaps). In each band, a designated safe corridor $[S_{\text{start}}, S_{\text{end}}]$ with width $\ge 120\text{px}$ is explicitly reserved before procedural placement of holes in the remaining spaces. Consecutive corridors shift by at most $170\text{px}$, ensuring smooth navigateable paths.
 
 ---
 
 ## 4. Visual Design & Theme Integration
 - **Hole Interior**: Deep pitch black (`#050507`), representing an abyss through the mountain wall.
-- **Inner Shadow / Recessed Rim**: Soft top/left ambient occlusion shadow (`rgba(0, 0, 0, 0.45)`) creating the optical illusion of wall thickness.
-- **Theme-Textured Border**: Thin border ($2.5\text{px}$) matching the active theme (warm wood with contour bevel in the default theme, neon glow in future neon theme).
+- **Inner Shadow / Recessed Rim**: Soft top-left ambient occlusion shadow (`rgba(0, 0, 0, 0.45)`) creating the optical illusion of carved wall depth.
+- **Theme-Textured Border**: Thick border ($4.5\text{px}$) with outer dark contour ($1.5\text{px}$) and warm top highlight bevel matching the active theme.
 - **Speed Gauge Ticks**: Clean minimalist tick marks along $X \in [8\text{px}, 24\text{px}]$ (left) and $X \in [696\text{px}, 712\text{px}]$ (right). Every 5th tick is an extended major mark.
 
 ---

@@ -77,18 +77,21 @@ export class WallManager extends Phaser.GameObjects.Container {
 
   /**
    * Starts downward wall progression.
-   * Called as soon as the marble finishes its arrival bounce animation.
+   * Generates shapes starting halfway down the screen so the player has immediate obstacles in sight,
+   * continuing seamlessly upward past the top of the viewport.
    */
   public startSpawning(): void {
     if (this.isScrolling) return;
     this.isScrolling = true;
 
-    // First pattern appears at the top of the screen (Y <= 0) moving downward
+    // First pattern appears halfway down the screen (50% viewport height) moving downward
     if (this.holes.length === 0) {
-      this.highestGeneratedY = 0;
+      const h = this.scene.scale.height;
+      this.highestGeneratedY = h * (WALL_CONFIG.initialBottomRatio ?? 0.50);
       this.lastSafeCorridorX = (WALL_CONFIG.playableMarginLeft + WALL_CONFIG.playableMarginRight) / 2;
-      // Pre-generate initial bands above the viewport
+      // Pre-generate initial bands from halfway down the screen upward past the top of viewport
       this.generateBandsUpTo(-WALL_CONFIG.bandHeight * 2);
+      this.renderAll(h);
     }
   }
 
@@ -146,13 +149,13 @@ export class WallManager extends Phaser.GameObjects.Container {
 
     // 2. Left Region: [minX, safeLeft - 18]
     const leftRegionW = (safeLeft - 18) - minX;
-    if (leftRegionW >= WALL_CONFIG.rectMinWidth) {
+    if (leftRegionW >= 70) {
       this.populateRegionHoles(minX, safeLeft - 18, bandTopY, bandH);
     }
 
     // 3. Right Region: [safeRight + 18, maxX]
     const rightRegionW = maxX - (safeRight + 18);
-    if (rightRegionW >= WALL_CONFIG.rectMinWidth) {
+    if (rightRegionW >= 70) {
       this.populateRegionHoles(safeRight + 18, maxX, bandTopY, bandH);
     }
   }
@@ -167,8 +170,8 @@ export class WallManager extends Phaser.GameObjects.Container {
     bandH: number
   ): void {
     const regionW = regionRight - regionLeft;
-    // If region is wide (> 240px), place up to 2 holes; otherwise place 1 hole
-    const holeCount = regionW > 240 && Math.random() > 0.4 ? 2 : 1;
+    // If region is wide (> 320px), place up to 2 holes; otherwise place 1 big hole
+    const holeCount = regionW > 320 && Math.random() > 0.45 ? 2 : 1;
 
     const slotW = regionW / holeCount;
     for (let i = 0; i < holeCount; i++) {
@@ -176,19 +179,24 @@ export class WallManager extends Phaser.GameObjects.Container {
       const slotRight = regionLeft + (i + 1) * slotW - 8;
       const availableW = slotRight - slotLeft;
 
-      if (availableW < 60) continue;
+      if (availableW < 70) continue;
 
       const isTriangle = Math.random() > 0.5;
-      const holeY = bandTopY + Phaser.Math.Between(10, Math.max(12, bandH - 95));
+      const maxHoleH = Math.max(WALL_CONFIG.rectMinHeight, bandH - 30);
+      const holeY = bandTopY + Phaser.Math.Between(10, Math.max(12, bandH - maxHoleH));
 
       if (isTriangle) {
-        // Procedural Triangle Hole
+        // Procedural Triangle Hole (bigger size)
         const baseW = Phaser.Math.Clamp(
           Phaser.Math.Between(WALL_CONFIG.triMinBase, WALL_CONFIG.triMaxBase),
-          55,
+          70,
           availableW
         );
-        const triH = Phaser.Math.Between(WALL_CONFIG.triMinHeight, WALL_CONFIG.triMaxHeight);
+        const triH = Phaser.Math.Clamp(
+          Phaser.Math.Between(WALL_CONFIG.triMinHeight, WALL_CONFIG.triMaxHeight),
+          70,
+          maxHoleH
+        );
         const startX = Phaser.Math.Between(slotLeft, slotRight - baseW);
         const isInverted = Math.random() > 0.5;
 
@@ -216,13 +224,17 @@ export class WallManager extends Phaser.GameObjects.Container {
           p3,
         });
       } else {
-        // Procedural Rectangle Hole
+        // Procedural Rectangle Hole (bigger size)
         const rectW = Phaser.Math.Clamp(
           Phaser.Math.Between(WALL_CONFIG.rectMinWidth, WALL_CONFIG.rectMaxWidth),
-          60,
+          70,
           availableW
         );
-        const rectH = Phaser.Math.Between(WALL_CONFIG.rectMinHeight, WALL_CONFIG.rectMaxHeight);
+        const rectH = Phaser.Math.Clamp(
+          Phaser.Math.Between(WALL_CONFIG.rectMinHeight, WALL_CONFIG.rectMaxHeight),
+          60,
+          maxHoleH
+        );
         const rectX = Phaser.Math.Between(slotLeft, slotRight - rectW);
 
         this.holes.push({

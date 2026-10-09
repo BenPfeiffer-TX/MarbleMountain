@@ -112,7 +112,9 @@ export class MainScene extends Phaser.Scene {
     this.playContainer = this.add.container(0, 0);
 
     // 0. Procedural Wall Holes & Speed Gauge (behind bar and marble)
+    // Starts shapes halfway down the screen immediately as game begins
     this.wallManager = new WallManager(this);
+    this.wallManager.startSpawning();
     this.playContainer.add(this.wallManager);
 
     // 1. Wood Grain Bar (rotates around pinned center 0,0 - no visible pivot)
@@ -129,9 +131,6 @@ export class MainScene extends Phaser.Scene {
       barCenterY - BAR_CONFIG.barHeight / 2 - MARBLE_CONFIG.radius
     );
     this.marble.setOnGameOver(() => this.triggerGameOver());
-    this.marble.setOnBounceComplete(() => {
-      this.wallManager.startSpawning();
-    });
     this.playContainer.add(this.marble);
 
     // 3. Invisible Outer Touch Zones
@@ -157,7 +156,6 @@ export class MainScene extends Phaser.Scene {
       });
     } else {
       this.marble.resetToCenter(barCenterX, barCenterY, 0, BAR_CONFIG.barHeight);
-      this.wallManager.startSpawning();
     }
 
     // Subscribe to dynamic theme switches for the bar
