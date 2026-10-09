@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
-import { Marble } from '../components/Marble';
+import { Marble, MarbleState } from '../components/Marble';
+import { WallManager } from '../components/WallManager';
 import { GameOverModal } from '../ui/GameOverModal';
 import { MARBLE_CONFIG } from '../config/marbleConfig';
 import { BackgroundScene } from './BackgroundScene';
@@ -42,8 +43,9 @@ export const BAR_CONFIG = {
 };
 
 export class MainScene extends Phaser.Scene {
-  // Gameplay containers
+  // Gameplay containers & managers
   private playContainer!: Phaser.GameObjects.Container;
+  private wallManager!: WallManager;
   private barContainer!: Phaser.GameObjects.Container;
   private barGraphics!: Phaser.GameObjects.Graphics;
 
@@ -106,8 +108,12 @@ export class MainScene extends Phaser.Scene {
     }
     this.scene.bringToTop();
 
-    // Container grouping game elements (bar + marble) for collective frosted glass blur
+    // Container grouping game elements (wall + bar + marble) for collective frosted glass blur
     this.playContainer = this.add.container(0, 0);
+
+    // 0. Procedural Wall Holes & Speed Gauge (behind bar and marble)
+    this.wallManager = new WallManager(this);
+    this.playContainer.add(this.wallManager);
 
     // 1. Wood Grain Bar (rotates around pinned center 0,0 - no visible pivot)
     this.barContainer = this.add.container(barCenterX, barCenterY);
@@ -123,6 +129,9 @@ export class MainScene extends Phaser.Scene {
       barCenterY - BAR_CONFIG.barHeight / 2 - MARBLE_CONFIG.radius
     );
     this.marble.setOnGameOver(() => this.triggerGameOver());
+    this.marble.setOnBounceComplete(() => {
+      this.wallManager.startSpawning();
+    });
     this.playContainer.add(this.marble);
 
     // 3. Invisible Outer Touch Zones
@@ -148,6 +157,7 @@ export class MainScene extends Phaser.Scene {
       });
     } else {
       this.marble.resetToCenter(barCenterX, barCenterY, 0, BAR_CONFIG.barHeight);
+      this.wallManager.startSpawning();
     }
 
     // Subscribe to dynamic theme switches for the bar
@@ -309,7 +319,10 @@ export class MainScene extends Phaser.Scene {
       this.barContainer.setRotation(this.currentAngleRad);
     }
 
-    // 2. Update marble physics and rolling dynamics
+    // 2. Update wall obstacles and speed gauge progression
+    this.wallManager.updateWall(dt, height);
+
+    // 3. Update marble physics and rolling dynamics
     this.marble.updatePhysics(
       dt,
       this.barContainer.x,
@@ -322,6 +335,16 @@ export class MainScene extends Phaser.Scene {
       height,
       width
     );
+
+    // 4. Wall Hole Collision Check: Triggers pit fall animation when marble center enters a hole
+    if (this.marble.getMarbleState() === MarbleState.ROLLING) {
+      const hole = this.wallManager.getHoleAt(this.marble.x, this.marble.y);
+      if (hole) {
+        const center = this.wallManager.getHoleScreenCenter(hole);
+        this.marble.startHoleFall(center);
+        this.wallManager.stopScrolling();
+      }
+    }
   }
 
   /**
@@ -332,6 +355,9 @@ export class MainScene extends Phaser.Scene {
   private triggerGameOver(): void {
     if (this.isGameOverActive) return;
     this.isGameOverActive = true;
+
+    // Stop wall motion immediately
+    this.wallManager.stopScrolling();
 
     // Release all active touch pointers
     this.leftPointerId = null;
@@ -378,6 +404,10 @@ export class MainScene extends Phaser.Scene {
       this.angularVelocity = 0;
       this.barContainer.setRotation(0);
 
+      // Reset wall obstacles and restart scrolling
+      this.wallManager.reset();
+      this.wallManager.startSpawning();
+
       // Reset marble on top of the bar
       this.marble.resetToCenter(barCenterX, barCenterY, 0, BAR_CONFIG.barHeight);
       this.isGameOverActive = false;
@@ -389,6 +419,8 @@ export class MainScene extends Phaser.Scene {
    * Clears frosted glass blur and switches scenes.
    */
   private handleMainMenu(): void {
+    this.wallManager.reset();
+
     const bgScene = this.scene.get('BackgroundScene') as BackgroundScene;
     if (bgScene && typeof bgScene.setFrostedBlur === 'function') {
       bgScene.setFrostedBlur(false);

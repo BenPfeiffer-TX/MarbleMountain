@@ -9,6 +9,7 @@ export enum MarbleState {
   ARRIVAL_BOUNCE = 'ARRIVAL_BOUNCE',
   ROLLING = 'ROLLING',
   FALLING = 'FALLING',
+  FALLING_INTO_HOLE = 'FALLING_INTO_HOLE',
   GAME_OVER = 'GAME_OVER',
 }
 
@@ -20,6 +21,7 @@ export enum MarbleState {
  * 2. Pure rolling physics along the mechanical tilting bar (no sliding, inertia + friction).
  * 3. Kinetic arrival lift-off and bounce sequence when entering the scene.
  * 4. Free-fall projectile physics when rolling off the bar tips.
+ * 5. Realistic pit fall animation when passing over procedural wall holes.
  */
 export class Marble extends Phaser.GameObjects.Container {
   private marbleState: MarbleState = MarbleState.ENTERING;
@@ -39,13 +41,15 @@ export class Marble extends Phaser.GameObjects.Container {
   // Rolling rotation angle around center (radians)
   private rollAngle: number = 0;
 
-  // Visual sub-elements (2-layer composition)
+  // Visual sub-elements (2-layer composition + pit shade overlay)
   private dropShadow!: Phaser.GameObjects.Graphics;
   private bodySprite!: Phaser.GameObjects.Image; // Layer 1: Base sphere / pattern that physically rolls
   private overlaySprite?: Phaser.GameObjects.Image; // Layer 2: Stationary specular highlight & 3D gloss
+  private pitShadeOverlay!: Phaser.GameObjects.Graphics; // Dark shading overlay during pit fall
   private unsubscribeTheme?: () => void;
 
   private onGameOverCallback?: () => void;
+  private onBounceCompleteCallback?: () => void;
 
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y);
@@ -91,6 +95,13 @@ export class Marble extends Phaser.GameObjects.Container {
       this.overlaySprite = this.scene.add.image(0, 0, overlayKey);
       this.add(this.overlaySprite);
     }
+
+    // 4. Shading overlay for hole fall animation (initially transparent)
+    this.pitShadeOverlay = this.scene.add.graphics();
+    this.pitShadeOverlay.fillStyle(0x050507, 1.0);
+    this.pitShadeOverlay.fillCircle(0, 0, r + 1);
+    this.pitShadeOverlay.setAlpha(0);
+    this.add(this.pitShadeOverlay);
   }
 
   /**
@@ -132,16 +143,29 @@ export class Marble extends Phaser.GameObjects.Container {
   }
 
   /**
-   * Sets callback when ball falls off-screen to trigger Game Over modal.
+   * Sets callback when ball falls off-screen or into hole to trigger Game Over modal.
    */
   public setOnGameOver(cb: () => void): void {
     this.onGameOverCallback = cb;
   }
 
   /**
+   * Sets callback when ball finishes arrival bounce animation.
+   */
+  public setOnBounceComplete(cb: () => void): void {
+    this.onBounceCompleteCallback = cb;
+  }
+
+  /**
    * Resets marble state and positions it centered on top of the bar.
    */
   public resetToCenter(barX: number, barY: number, barAngle: number, barHeight: number): void {
+    this.scene.tweens.killTweensOf(this);
+    if (this.pitShadeOverlay) {
+      this.scene.tweens.killTweensOf(this.pitShadeOverlay);
+      this.pitShadeOverlay.setAlpha(0);
+    }
+    this.setScale(1);
     this.marbleState = MarbleState.ROLLING;
     this.s = 0;
     this.v_s = 0;
@@ -160,6 +184,54 @@ export class Marble extends Phaser.GameObjects.Container {
     const dPerp = barHeight / 2 + r;
     this.x = barX + dPerp * Math.sin(barAngle);
     this.y = barY - dPerp * Math.cos(barAngle);
+  }
+
+  /**
+   * Triggers the pit fall animation when marble center passes over a wall hole:
+   * 1. Hides the drop shadow immediately.
+   * 2. Smoothly shifts position toward the hole center (if provided).
+   * 3. Scales down into perspective depth (1.0 -> 0.18).
+   * 4. Ramps up pitShadeOverlay alpha (0 -> 0.96) so the marble darkens into the abyss.
+   * 5. On complete, transitions to GAME_OVER and triggers the Game Over modal.
+   */
+  public startHoleFall(holeCenter?: { x: number; y: number }): void {
+    if (
+      this.marbleState === MarbleState.FALLING_INTO_HOLE ||
+      this.marbleState === MarbleState.GAME_OVER
+    ) {
+      return;
+    }
+
+    this.marbleState = MarbleState.FALLING_INTO_HOLE;
+    this.dropShadow.setAlpha(0);
+
+    const targetX = holeCenter ? holeCenter.x : this.x;
+    const targetY = holeCenter ? holeCenter.y : this.y + 40;
+
+    // Tween position slightly toward the center of the pit while falling
+    this.scene.tweens.add({
+      targets: this,
+      x: (this.x * 2 + targetX) / 3,
+      y: (this.y * 2 + targetY) / 3,
+      scaleX: 0.18,
+      scaleY: 0.18,
+      duration: 520,
+      ease: 'Quad.easeIn',
+      onComplete: () => {
+        this.marbleState = MarbleState.GAME_OVER;
+        if (this.onGameOverCallback) {
+          this.onGameOverCallback();
+        }
+      },
+    });
+
+    // Darken into the shadow of the pit
+    this.scene.tweens.add({
+      targets: this.pitShadeOverlay,
+      alpha: 0.96,
+      duration: 480,
+      ease: 'Quad.easeIn',
+    });
   }
 
   /**
@@ -187,6 +259,13 @@ export class Marble extends Phaser.GameObjects.Container {
     screenHeight: number,
     screenWidth: number
   ): void {
+    if (
+      this.marbleState === MarbleState.FALLING_INTO_HOLE ||
+      this.marbleState === MarbleState.GAME_OVER
+    ) {
+      return;
+    }
+
     const r = MARBLE_CONFIG.radius;
 
     // --- STATE 1: ENTERING (Riding bar upward from off-screen) ---
@@ -230,6 +309,9 @@ export class Marble extends Phaser.GameObjects.Container {
           this.dropShadow.setScale(1);
           this.dropShadow.setAlpha(MARBLE_CONFIG.shadowAlpha);
           this.marbleState = MarbleState.ROLLING;
+          if (this.onBounceCompleteCallback) {
+            this.onBounceCompleteCallback();
+          }
         }
       }
 

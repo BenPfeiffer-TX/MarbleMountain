@@ -93,10 +93,51 @@ export interface ButtonTheme {
   ): void;
 }
 
+export interface HoleTheme {
+  id: string;
+  name: string;
+  borderColor: number;
+  borderWidth: number;
+  innerShadowColor: number;
+  tickColor: number;
+  /**
+   * Draws a rectangular hole with thin theme-textured border and deep pit interior.
+   */
+  drawRectHole(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    cornerRadius?: number
+  ): void;
+  /**
+   * Draws a triangular hole with thin theme-textured border and deep pit interior.
+   */
+  drawTriHole(
+    g: Phaser.GameObjects.Graphics,
+    p1: { x: number; y: number },
+    p2: { x: number; y: number },
+    p3: { x: number; y: number }
+  ): void;
+  /**
+   * Draws an altitude tick mark on the speed gauge.
+   */
+  drawTick(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    length: number,
+    direction: 1 | -1,
+    isMajor: boolean
+  ): void;
+}
+
 export interface GameTheme {
   id: string;
   name: string;
   marble: MarbleTheme;
   bar: BarTheme;
   button: ButtonTheme;
+  hole: HoleTheme;
 }

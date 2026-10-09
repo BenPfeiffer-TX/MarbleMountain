@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { GameTheme, MarbleTheme, BarTheme, ButtonTheme } from './types';
+import { GameTheme, MarbleTheme, BarTheme, ButtonTheme, HoleTheme } from './types';
 
 /**
  * DEFAULT THEME: CLASSIC WOOD & SHINY STEEL BALL BEARING
@@ -244,10 +244,90 @@ export const classicWoodButtonTheme: ButtonTheme = {
   },
 };
 
+export const classicWoodHoleTheme: HoleTheme = {
+  id: 'classicWoodHole',
+  name: 'Classic Wood Hole',
+  borderColor: 0x9c6638,
+  borderWidth: 2.5,
+  innerShadowColor: 0x000000,
+  tickColor: 0x8b6544,
+
+  drawRectHole(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    cornerRadius: number = 8
+  ): void {
+    // 1. Deep pitch black pit interior
+    g.fillStyle(0x050507, 1.0);
+    g.fillRoundedRect(x, y, width, height, cornerRadius);
+
+    // 2. Soft inner shadow at top-left rim (simulates wall depth)
+    g.fillStyle(0x000000, 0.40);
+    g.fillRoundedRect(x + 1.5, y + 1.5, width - 3, Math.min(10, height * 0.25), Math.max(2, cornerRadius - 2));
+
+    // 3. Thin warm wood border matching the bar and buttons
+    g.lineStyle(2.5, 0x9c6638, 1.0);
+    g.strokeRoundedRect(x, y, width, height, cornerRadius);
+
+    // 4. Subtle outer dark bevel line for crisp tactile contrast against background
+    g.lineStyle(1.0, 0x5a3617, 0.45);
+    g.strokeRoundedRect(x - 0.5, y - 0.5, width + 1, height + 1, cornerRadius + 0.5);
+  },
+
+  drawTriHole(
+    g: Phaser.GameObjects.Graphics,
+    p1: { x: number; y: number },
+    p2: { x: number; y: number },
+    p3: { x: number; y: number }
+  ): void {
+    // 1. Deep pitch black pit interior
+    g.fillStyle(0x050507, 1.0);
+    g.beginPath();
+    g.moveTo(p1.x, p1.y);
+    g.lineTo(p2.x, p2.y);
+    g.lineTo(p3.x, p3.y);
+    g.closePath();
+    g.fillPath();
+
+    // 2. Thin warm wood border matching the bar and buttons
+    g.lineStyle(2.5, 0x9c6638, 1.0);
+    g.beginPath();
+    g.moveTo(p1.x, p1.y);
+    g.lineTo(p2.x, p2.y);
+    g.lineTo(p3.x, p3.y);
+    g.closePath();
+    g.strokePath();
+
+    // 3. Subtle dark contour bevel
+    g.lineStyle(1.0, 0x5a3617, 0.45);
+    g.strokePath();
+  },
+
+  drawTick(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    length: number,
+    direction: 1 | -1,
+    isMajor: boolean
+  ): void {
+    const endX = x + length * direction;
+    const alpha = isMajor ? 0.65 : 0.35;
+    const width = isMajor ? 2.5 : 1.5;
+
+    g.lineStyle(width, 0x8b6544, alpha);
+    g.lineBetween(x, y, endX, y);
+  },
+};
+
 export const DEFAULT_GAME_THEME: GameTheme = {
   id: 'classicWoodAndSteel',
   name: 'Classic Wood & Steel',
   marble: shinySteelBearingMarbleTheme,
   bar: classicWoodBarTheme,
   button: classicWoodButtonTheme,
+  hole: classicWoodHoleTheme,
 };
