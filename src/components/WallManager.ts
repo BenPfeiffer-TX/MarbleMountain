@@ -442,19 +442,20 @@ export class WallManager extends Phaser.GameObjects.Container {
       let candidate: Hole | null = null;
 
       // Shape Family Selection:
-      // Balanced distribution with NO bean bias:
-      // 0.00 - 0.32: Rectangles (Ramps, Slabs, Bars) - 32%
-      // 0.32 - 0.58: Triangles (Sharp Wedges, Ramps) - 26%
-      // 0.58 - 0.76: Ellipses (Giant & Medium Ovals) - 18%
-      // 0.76 - 0.90: Beans (Organic Kidney Curves) - 14%
-      // 0.90 - 1.00: Circles (Round Pits) - 10%
+      // Dominant Rectangles & Triangles (84% total!):
+      // 0.00 - 0.48: Rectangles (45° Ramps, Slabs, Steep Dividers, Bars) - 48%
+      // 0.48 - 0.84: Triangles (Sharp Wedges, Inclined Ramps, Corner Triangles) - 36%
+      // 0.84 - 0.90: Ellipses (Ovals) - 6%
+      // 0.90 - 0.95: Beans (Organic Kidney Curves) - 5%
+      // 0.95 - 1.00: Circles (Round Pits) - 5%
       const roll = Math.random();
-      const canBeGiant = isMajor && availW >= 190;
+      const canBeGiant = isMajor && availW >= 180;
 
-      if (roll < 0.32) {
-        // 1. RECTANGLE / RAMP / SLAB (32%)
+      if (roll < 0.48) {
+        // 1. RECTANGLE / RAMP / SLAB (48%)
         if (canBeGiant) {
-          if (Math.random() < 0.65) {
+          const rectTypeRoll = Math.random();
+          if (rectTypeRoll < 0.55) {
             // Giant 45-Degree Diagonal Ramp
             const length = Phaser.Math.Clamp(
               Phaser.Math.Between(WALL_CONFIG.giantRectMinLength, WALL_CONFIG.giantRectMaxLength),
@@ -468,19 +469,40 @@ export class WallManager extends Phaser.GameObjects.Container {
             const angleSign = Math.random() > 0.5 ? 1 : -1;
             const angleDeg = angleSign * Phaser.Math.Between(36, 52);
             const angle = Phaser.Math.DegToRad(angleDeg);
-            const cx = (minX + maxX) / 2 + Phaser.Math.Between(-15, 15);
+            const hw = (length / 2) * Math.abs(Math.cos(angle)) + (thickness / 2) * Math.abs(Math.sin(angle));
+            const minC = minX + hw + 2;
+            const maxC = maxX - hw - 2;
+            const cx = minC <= maxC ? Phaser.Math.Between(minC, maxC) : (minX + maxX) / 2;
             candidate = createRectHole(id, cx, targetY, length, thickness, angle, 16);
-          } else {
-            // Giant Barrier Slab
+          } else if (rectTypeRoll < 0.82) {
+            // Giant Barrier Slab / Low-Angle Ramp
             const length = Phaser.Math.Clamp(
-              Phaser.Math.Between(220, 340),
+              Phaser.Math.Between(220, 350),
               180,
               availW - 6
             );
             const thickness = Phaser.Math.Between(60, 85);
-            const angle = Phaser.Math.FloatBetween(-Phaser.Math.DegToRad(18), Phaser.Math.DegToRad(18));
-            const cx = (minX + maxX) / 2 + Phaser.Math.Between(-15, 15);
+            const angle = Phaser.Math.FloatBetween(-Phaser.Math.DegToRad(20), Phaser.Math.DegToRad(20));
+            const hw = (length / 2) * Math.abs(Math.cos(angle)) + (thickness / 2) * Math.abs(Math.sin(angle));
+            const minC = minX + hw + 2;
+            const maxC = maxX - hw - 2;
+            const cx = minC <= maxC ? Phaser.Math.Between(minC, maxC) : (minX + maxX) / 2;
             candidate = createRectHole(id, cx, targetY, length, thickness, angle, 14);
+          } else {
+            // Steep Slotted Barrier / Vertical Lane Divider
+            const length = Phaser.Math.Clamp(
+              Phaser.Math.Between(190, 290),
+              160,
+              300
+            );
+            const thickness = Phaser.Math.Between(65, 90);
+            const angleSign = Math.random() > 0.5 ? 1 : -1;
+            const angle = Phaser.Math.DegToRad(angleSign * Phaser.Math.Between(62, 78));
+            const hw = (length / 2) * Math.abs(Math.cos(angle)) + (thickness / 2) * Math.abs(Math.sin(angle));
+            const minC = minX + hw + 2;
+            const maxC = maxX - hw - 2;
+            const cx = minC <= maxC ? Phaser.Math.Between(minC, maxC) : (minX + maxX) / 2;
+            candidate = createRectHole(id, cx, targetY, length, thickness, angle, 16);
           }
         } else {
           // Medium Angled Rectangle
@@ -493,27 +515,53 @@ export class WallManager extends Phaser.GameObjects.Container {
             WALL_CONFIG.medRectMinThickness,
             WALL_CONFIG.medRectMaxThickness
           );
-          const angle = Phaser.Math.FloatBetween(-Phaser.Math.DegToRad(48), Phaser.Math.DegToRad(48));
-          const cx = (minX + maxX) / 2 + Phaser.Math.Between(-12, 12);
+          const angle = Phaser.Math.FloatBetween(-Phaser.Math.DegToRad(55), Phaser.Math.DegToRad(55));
+          const hw = (length / 2) * Math.abs(Math.cos(angle)) + (thickness / 2) * Math.abs(Math.sin(angle));
+          const minC = minX + hw + 2;
+          const maxC = maxX - hw - 2;
+          const cx = minC <= maxC ? Phaser.Math.Between(minC, maxC) : (minX + maxX) / 2;
           candidate = createRectHole(id, cx, targetY, length, thickness, angle, 12);
         }
-      } else if (roll < 0.58) {
-        // 2. TRIANGLE / SHARP WEDGE (26%)
+      } else if (roll < 0.84) {
+        // 2. TRIANGLE / SHARP WEDGE (36%)
         if (canBeGiant) {
-          const base = Phaser.Math.Clamp(
-            Phaser.Math.Between(WALL_CONFIG.giantTriMinBase, WALL_CONFIG.giantTriMaxBase),
-            180,
-            Math.min(availW * 1.15, 310)
-          );
-          const height = Phaser.Math.Between(
-            WALL_CONFIG.giantTriMinHeight,
-            WALL_CONFIG.giantTriMaxHeight
-          );
-          const skew = Phaser.Math.FloatBetween(-0.45, 0.45);
-          const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-          const cx = (minX + maxX) / 2 + Phaser.Math.Between(-15, 15);
-          candidate = createTriHole(id, cx, targetY, base, height, skew, angle);
+          const triTypeRoll = Math.random();
+          if (triTypeRoll < 0.60) {
+            // Giant Sharp Triangular Wedge
+            const base = Phaser.Math.Clamp(
+              Phaser.Math.Between(WALL_CONFIG.giantTriMinBase, WALL_CONFIG.giantTriMaxBase),
+              180,
+              Math.min(availW * 1.15, 310)
+            );
+            const height = Phaser.Math.Between(
+              WALL_CONFIG.giantTriMinHeight,
+              WALL_CONFIG.giantTriMaxHeight
+            );
+            const skew = Phaser.Math.FloatBetween(-0.45, 0.45);
+            const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+            const hw = base * 0.45;
+            const minC = minX + hw + 2;
+            const maxC = maxX - hw - 2;
+            const cx = minC <= maxC ? Phaser.Math.Between(minC, maxC) : (minX + maxX) / 2;
+            candidate = createTriHole(id, cx, targetY, base, height, skew, angle);
+          } else {
+            // Giant Right-Angled / Ramp Triangle
+            const base = Phaser.Math.Clamp(
+              Phaser.Math.Between(180, 290),
+              160,
+              availW - 6
+            );
+            const height = Phaser.Math.Between(130, 220);
+            const skew = Math.random() > 0.5 ? 0.85 : -0.85; // Sharp right-angle incline
+            const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
+            const hw = base * 0.45;
+            const minC = minX + hw + 2;
+            const maxC = maxX - hw - 2;
+            const cx = minC <= maxC ? Phaser.Math.Between(minC, maxC) : (minX + maxX) / 2;
+            candidate = createTriHole(id, cx, targetY, base, height, skew, angle);
+          }
         } else {
+          // Medium Sharp Triangle
           const base = Phaser.Math.Clamp(
             Phaser.Math.Between(WALL_CONFIG.medTriMinBase, WALL_CONFIG.medTriMaxBase),
             80,
@@ -523,13 +571,16 @@ export class WallManager extends Phaser.GameObjects.Container {
             WALL_CONFIG.medTriMinHeight,
             WALL_CONFIG.medTriMaxHeight
           );
-          const skew = Phaser.Math.FloatBetween(-0.35, 0.35);
+          const skew = Phaser.Math.FloatBetween(-0.40, 0.40);
           const angle = Phaser.Math.FloatBetween(0, Math.PI * 2);
-          const cx = (minX + maxX) / 2 + Phaser.Math.Between(-12, 12);
+          const hw = base * 0.45;
+          const minC = minX + hw + 2;
+          const maxC = maxX - hw - 2;
+          const cx = minC <= maxC ? Phaser.Math.Between(minC, maxC) : (minX + maxX) / 2;
           candidate = createTriHole(id, cx, targetY, base, height, skew, angle);
         }
-      } else if (roll < 0.76) {
-        // 3. ELLIPSE / ROTATED OVAL (18%)
+      } else if (roll < 0.90) {
+        // 3. ELLIPSE / ROTATED OVAL (6%)
         if (canBeGiant) {
           const rx = Phaser.Math.Clamp(
             Phaser.Math.Between(WALL_CONFIG.giantEllipseMinRx, WALL_CONFIG.giantEllipseMaxRx),
@@ -557,8 +608,8 @@ export class WallManager extends Phaser.GameObjects.Container {
           const cx = (minX + maxX) / 2 + Phaser.Math.Between(-10, 10);
           candidate = createEllipseHole(id, cx, targetY, rx, ry, angle);
         }
-      } else if (roll < 0.90) {
-        // 4. ORGANIC KIDNEY BEAN (14% - no longer biased!)
+      } else if (roll < 0.95) {
+        // 4. ORGANIC KIDNEY BEAN (5% - occasional accent)
         const length = Phaser.Math.Clamp(
           Phaser.Math.Between(WALL_CONFIG.beanMinLength, WALL_CONFIG.beanMaxLength),
           120,
@@ -573,7 +624,7 @@ export class WallManager extends Phaser.GameObjects.Container {
         const cx = (minX + maxX) / 2 + Phaser.Math.Between(-15, 15);
         candidate = createBeanHole(id, cx, targetY, length, thickness, angle, bendOffset, 0.15);
       } else {
-        // 5. CIRCULAR PIT (10%)
+        // 5. CIRCULAR PIT (5%)
         const radius = Phaser.Math.Clamp(
           Phaser.Math.Between(WALL_CONFIG.circleMinRadius, WALL_CONFIG.circleMaxRadius),
           26,
@@ -606,13 +657,15 @@ export class WallManager extends Phaser.GameObjects.Container {
       const screenTopInWallSpace = -this.wallOffsetY;
       this.generateUpTo(screenTopInWallSpace - 450);
 
-      // Cull holes that have scrolled past the bottom of the screen
-      const screenBottomInWallSpace = screenHeight - this.wallOffsetY + 150;
-      this.holes = this.holes.filter((h) => h.maxY <= screenBottomInWallSpace);
+      // Cull holes that have scrolled completely past the bottom of the screen.
+      // Must check hole.minY (the top edge of the hole), NOT hole.maxY!
+      // A hole is only completely off-screen once its top edge has scrolled well past the viewport bottom.
+      const cullThresholdY = screenHeight - this.wallOffsetY + 250;
+      this.holes = this.holes.filter((h) => h.minY <= cullThresholdY);
 
       // Cull old corridor waypoints far below the screen
       this.corridorWaypoints = this.corridorWaypoints.filter(
-        (a) => a.y <= screenBottomInWallSpace + 300
+        (a) => a.y <= cullThresholdY + 300
       );
     }
 
@@ -630,7 +683,7 @@ export class WallManager extends Phaser.GameObjects.Container {
     for (const hole of this.holes) {
       const screenMinY = hole.minY + this.wallOffsetY;
       const screenMaxY = hole.maxY + this.wallOffsetY;
-      if (screenMaxY < -60 || screenMinY > screenHeight + 60) continue;
+      if (screenMaxY < -100 || screenMinY > screenHeight + 100) continue;
 
       renderHole(this.holesGraphics, theme, hole, this.wallOffsetY);
     }
