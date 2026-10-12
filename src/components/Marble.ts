@@ -159,31 +159,50 @@ export class Marble extends Phaser.GameObjects.Container {
   /**
    * Resets marble state and positions it centered on top of the bar.
    */
-  public resetToCenter(barX: number, barY: number, barAngle: number, barHeight: number): void {
+  public resetToCenter(
+    barX: number,
+    barY: number,
+    barAngle: number,
+    barHeight: number,
+    withBounce: boolean = true
+  ): void {
     this.scene.tweens.killTweensOf(this);
     if (this.pitShadeOverlay) {
       this.scene.tweens.killTweensOf(this.pitShadeOverlay);
       this.pitShadeOverlay.setAlpha(0);
     }
     this.setScale(1);
-    this.marbleState = MarbleState.ROLLING;
     this.s = 0;
     this.v_s = 0;
-    this.h = 0;
-    this.v_h = 0;
     this.rollAngle = 0;
     if (this.bodySprite) {
       this.bodySprite.setRotation(0);
     }
     const theme = ThemeManager.getActiveTheme().marble;
     theme.drawShadow(this.dropShadow, MARBLE_CONFIG.radius);
-    this.dropShadow.setAlpha(MARBLE_CONFIG.shadowAlpha);
-    this.dropShadow.setScale(1);
 
     const r = MARBLE_CONFIG.radius;
-    const dPerp = barHeight / 2 + r;
-    this.x = barX + dPerp * Math.sin(barAngle);
-    this.y = barY - dPerp * Math.cos(barAngle);
+
+    if (withBounce) {
+      this.marbleState = MarbleState.ARRIVAL_LIFT;
+      this.v_h = MARBLE_CONFIG.arrivalLiftSpeed * 0.75;
+      this.h = 0;
+      this.dropShadow.setScale(0.85);
+      this.dropShadow.setAlpha(MARBLE_CONFIG.shadowAlpha * 0.7);
+    } else {
+      this.marbleState = MarbleState.ROLLING;
+      this.h = 0;
+      this.v_h = 0;
+      this.dropShadow.setScale(1);
+      this.dropShadow.setAlpha(MARBLE_CONFIG.shadowAlpha);
+      if (this.onBounceCompleteCallback) {
+        this.onBounceCompleteCallback();
+      }
+    }
+
+    const dPerp = barHeight / 2 + r + this.h;
+    this.x = barX + this.s * Math.cos(barAngle) + dPerp * Math.sin(barAngle);
+    this.y = barY + this.s * Math.sin(barAngle) - dPerp * Math.cos(barAngle);
   }
 
   /**

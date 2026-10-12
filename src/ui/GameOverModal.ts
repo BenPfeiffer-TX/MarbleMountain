@@ -1,20 +1,26 @@
 import Phaser from 'phaser';
 import { MARBLE_CONFIG } from '../config/marbleConfig';
 import { createTactileButton } from './TactileButton';
+import { ScoreManager } from '../utils/ScoreManager';
 
 /**
  * GAME OVER MODAL COMPONENT
  *
- * Displays when the marble falls off the bar and off-screen:
- * - Frosted glass backdrop heavily blurring the view of the background and bar underneath.
- * - Rounded-edge card in the center of the screen with "Game over!" title.
+ * Displays when the marble falls off the bar or into a pit:
+ * - Frosted glass backdrop heavily blurring the view of background and bar.
+ * - Rounded-edge card in the center with "Game over!" title.
+ * - Current run score display.
+ * - Personal High Score Board tracking the single persistent high score value.
  * - Tactile 3D wood squircle buttons for "Try Again" and "Main Menu" side-by-side.
- * - Highscore chart with a blank list and soft semi-transparent grey vertical column divider lines.
  */
 export class GameOverModal extends Phaser.GameObjects.Container {
   private backdrop!: Phaser.GameObjects.Graphics;
   private cardContainer!: Phaser.GameObjects.Container;
   private isVisibleModal: boolean = false;
+
+  private scoreValueText!: Phaser.GameObjects.Text;
+  private highScoreValueText!: Phaser.GameObjects.Text;
+  private newBestBadge!: Phaser.GameObjects.Text;
 
   private onTryAgainCallback?: () => void;
   private onMainMenuCallback?: () => void;
@@ -92,9 +98,9 @@ export class GameOverModal extends Phaser.GameObjects.Container {
     this.cardContainer.add(cardBg);
 
     // 3. 'Game over!' Header Title
-    const titleText = this.scene.add.text(0, -h / 2 + 56, 'Game over!', {
+    const titleText = this.scene.add.text(0, -h / 2 + 52, 'Game over!', {
       fontFamily: fontStack,
-      fontSize: '52px',
+      fontSize: '50px',
       fontStyle: '900',
       color: '#3a2415',
       align: 'center',
@@ -102,12 +108,81 @@ export class GameOverModal extends Phaser.GameObjects.Container {
     titleText.setOrigin(0.5);
     this.cardContainer.add(titleText);
 
-    // 4. Two Tactile Wood Squircle Buttons side-by-side
-    // 'Try Again' on the left, 'Main Menu' to the right of it
-    const btnW = MARBLE_CONFIG.buttonWidth;
-    const btnH = MARBLE_CONFIG.buttonHeight;
-    const btnY = -h / 2 + 155;
-    const gap = MARBLE_CONFIG.buttonGap;
+    // 4. Current Run Score Display
+    const scoreLabelY = -h / 2 + 122;
+    const scoreLabel = this.scene.add.text(0, scoreLabelY, 'SCORE', {
+      fontFamily: fontStack,
+      fontSize: '15px',
+      fontStyle: '800',
+      color: '#826d5b',
+      letterSpacing: 2,
+      align: 'center',
+    });
+    scoreLabel.setOrigin(0.5);
+    this.cardContainer.add(scoreLabel);
+
+    this.scoreValueText = this.scene.add.text(0, scoreLabelY + 36, '0', {
+      fontFamily: fontStack,
+      fontSize: '52px',
+      fontStyle: '900',
+      color: '#3a2415',
+      align: 'center',
+    });
+    this.scoreValueText.setOrigin(0.5);
+    this.cardContainer.add(this.scoreValueText);
+
+    // 5. Personal High Score Board (single persistent value, no units)
+    const boardCenterY = -h / 2 + 258;
+    const boardW = w - 74;
+    const boardH = 118;
+    const boardR = 18;
+
+    const boardBg = this.scene.add.graphics();
+    // Inset recessed plate
+    boardBg.fillStyle(0xede2d3, 0.85);
+    boardBg.fillRoundedRect(-boardW / 2, boardCenterY - boardH / 2, boardW, boardH, boardR);
+    boardBg.lineStyle(1.5, 0xc4b29f, 0.7);
+    boardBg.strokeRoundedRect(-boardW / 2, boardCenterY - boardH / 2, boardW, boardH, boardR);
+    this.cardContainer.add(boardBg);
+
+    const highScoreLabel = this.scene.add.text(0, boardCenterY - 30, 'HIGH SCORE', {
+      fontFamily: fontStack,
+      fontSize: '15px',
+      fontStyle: '800',
+      color: '#6d5744',
+      letterSpacing: 2,
+      align: 'center',
+    });
+    highScoreLabel.setOrigin(0.5);
+    this.cardContainer.add(highScoreLabel);
+
+    this.highScoreValueText = this.scene.add.text(0, boardCenterY + 12, '0', {
+      fontFamily: fontStack,
+      fontSize: '50px',
+      fontStyle: '900',
+      color: '#2c1b0e',
+      align: 'center',
+    });
+    this.highScoreValueText.setOrigin(0.5);
+    this.cardContainer.add(this.highScoreValueText);
+
+    this.newBestBadge = this.scene.add.text(0, boardCenterY + 44, '★ NEW HIGH SCORE! ★', {
+      fontFamily: fontStack,
+      fontSize: '13px',
+      fontStyle: '900',
+      color: '#b45309',
+      letterSpacing: 1,
+      align: 'center',
+    });
+    this.newBestBadge.setOrigin(0.5);
+    this.newBestBadge.setVisible(false);
+    this.cardContainer.add(this.newBestBadge);
+
+    // 6. Two Tactile Wood Squircle Buttons side-by-side below the board
+    const btnW = 205;
+    const btnH = 68;
+    const btnY = -h / 2 + 420;
+    const gap = 20;
     const leftBtnX = -btnW / 2 - gap / 2;
     const rightBtnX = btnW / 2 + gap / 2;
 
@@ -139,112 +214,38 @@ export class GameOverModal extends Phaser.GameObjects.Container {
     });
     this.cardContainer.add(mainMenuBtn);
 
-    // 5. 'Highscore' Chart below the buttons
-    const chartY = -h / 2 + 250;
-    this.createHighscoreChart(chartY, w - 70, fontStack);
-
     this.add(this.cardContainer);
   }
 
   /**
-   * Creates the Highscore chart: blank list with columns separated only by
-   * soft semi-transparent grey vertical divider lines.
+   * Displays the Game Over modal with run score and personal high score.
    */
-  private createHighscoreChart(
-    topY: number,
-    chartW: number,
-    fontStack: string
-  ): void {
-    const halfW = chartW / 2;
-
-    // Header label
-    const headerTitle = this.scene.add.text(-halfW + 10, topY, 'Highscore', {
-      fontFamily: fontStack,
-      fontSize: '24px',
-      fontStyle: '800',
-      color: '#463222',
-    });
-    headerTitle.setOrigin(0, 0.5);
-    this.cardContainer.add(headerTitle);
-
-    // Columns: [0: Highscore (Name/Rank)], [1: Score], [2: Time]
-    const col1X = -halfW + 185; // First vertical divider line
-    const col2X = halfW - 120; // Second vertical divider line
-
-    const scoreHeader = this.scene.add.text(col1X + 24, topY, 'Score', {
-      fontFamily: fontStack,
-      fontSize: '18px',
-      fontStyle: '700',
-      color: '#7a6654',
-    });
-    scoreHeader.setOrigin(0, 0.5);
-    this.cardContainer.add(scoreHeader);
-
-    const timeHeader = this.scene.add.text(col2X + 24, topY, 'Time', {
-      fontFamily: fontStack,
-      fontSize: '18px',
-      fontStyle: '700',
-      color: '#7a6654',
-    });
-    timeHeader.setOrigin(0, 0.5);
-    this.cardContainer.add(timeHeader);
-
-    // Soft header horizontal underline
-    const linesG = this.scene.add.graphics();
-    const dividerColor = MARBLE_CONFIG.dividerLineColor;
-    const dividerAlpha = MARBLE_CONFIG.dividerLineAlpha;
-
-    linesG.lineStyle(1.5, dividerColor, dividerAlpha);
-    linesG.lineBetween(-halfW, topY + 22, halfW, topY + 22);
-
-    // ONLY lines outlining the list are soft, semi-transparent grey lines between columns:
-    const listBottomY = topY + 22 + MARBLE_CONFIG.highscoreRowCount * MARBLE_CONFIG.highscoreRowHeight + 10;
-    linesG.lineBetween(col1X, topY + 10, col1X, listBottomY);
-    linesG.lineBetween(col2X, topY + 10, col2X, listBottomY);
-    this.cardContainer.add(linesG);
-
-    // Blank list rows with subtle placeholders
-    const startRowY = topY + 44;
-    for (let i = 0; i < MARBLE_CONFIG.highscoreRowCount; i++) {
-      const rowY = startRowY + i * MARBLE_CONFIG.highscoreRowHeight;
-
-      // Row rank number
-      const rankText = this.scene.add.text(-halfW + 18, rowY, `${i + 1}.   - - -`, {
-        fontFamily: fontStack,
-        fontSize: '16px',
-        fontStyle: '600',
-        color: '#a49282',
-      });
-      rankText.setOrigin(0, 0.5);
-      this.cardContainer.add(rankText);
-
-      // Blank score placeholder
-      const scoreDash = this.scene.add.text(col1X + 40, rowY, '- -', {
-        fontFamily: fontStack,
-        fontSize: '16px',
-        fontStyle: '600',
-        color: '#b0a092',
-      });
-      scoreDash.setOrigin(0.5);
-      this.cardContainer.add(scoreDash);
-
-      // Blank time placeholder
-      const timeDash = this.scene.add.text(col2X + 44, rowY, '- -', {
-        fontFamily: fontStack,
-        fontSize: '16px',
-        fontStyle: '600',
-        color: '#b0a092',
-      });
-      timeDash.setOrigin(0.5);
-      this.cardContainer.add(timeDash);
-    }
-  }
-
-  public show(onTryAgain: () => void, onMainMenu: () => void): void {
+  public show(runScore: number, onTryAgain: () => void, onMainMenu: () => void): void {
     if (this.isVisibleModal) return;
     this.isVisibleModal = true;
     this.onTryAgainCallback = onTryAgain;
     this.onMainMenuCallback = onMainMenu;
+
+    // Record score in local persistent storage
+    const { highScore, isNewHighScore } = ScoreManager.recordScore(runScore);
+
+    this.scoreValueText.setText(runScore.toString());
+    this.highScoreValueText.setText(highScore.toString());
+
+    if (isNewHighScore && runScore > 0) {
+      this.newBestBadge.setVisible(true);
+      this.newBestBadge.setAlpha(1);
+      this.scene.tweens.add({
+        targets: this.newBestBadge,
+        scale: { from: 0.85, to: 1.08 },
+        duration: 260,
+        yoyo: true,
+        repeat: 2,
+        ease: 'Back.easeOut',
+      });
+    } else {
+      this.newBestBadge.setVisible(false);
+    }
 
     this.setVisible(true);
     this.setAlpha(0);

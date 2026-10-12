@@ -52,6 +52,12 @@ export class MainScene extends Phaser.Scene {
   // Marble component
   private marble!: Marble;
 
+  // Scoring state & UI
+  private score: number = 0;
+  private elapsedPlayingTime: number = 0;
+  private isScoringActive: boolean = false;
+  private scoreText!: Phaser.GameObjects.Text;
+
   // Game Over Modal UI
   private gameOverModal!: GameOverModal;
   private isGameOverActive: boolean = false;
@@ -100,6 +106,9 @@ export class MainScene extends Phaser.Scene {
     this.targetAngleRad = 0;
     this.angularVelocity = 0;
     this.isGameOverActive = false;
+    this.score = 0;
+    this.elapsedPlayingTime = 0;
+    this.isScoringActive = false;
 
     // Ensure persistent BackgroundScene is running behind MainScene
     if (!this.scene.isActive('BackgroundScene')) {
@@ -112,9 +121,9 @@ export class MainScene extends Phaser.Scene {
     this.playContainer = this.add.container(0, 0);
 
     // 0. Procedural Wall Holes & Speed Gauge (behind bar and marble)
-    // Starts shapes halfway down the screen immediately as game begins
+    // Pre-generates shapes and aligns tick 0 with the bar, waiting for ball bounce to start moving
     this.wallManager = new WallManager(this);
-    this.wallManager.startSpawning();
+    this.wallManager.pregenerate(height, barCenterY);
     this.playContainer.add(this.wallManager);
 
     // 1. Wood Grain Bar (rotates around pinned center 0,0 - no visible pivot)
@@ -131,18 +140,38 @@ export class MainScene extends Phaser.Scene {
       barCenterY - BAR_CONFIG.barHeight / 2 - MARBLE_CONFIG.radius
     );
     this.marble.setOnGameOver(() => this.triggerGameOver());
+    this.marble.setOnBounceComplete(() => {
+      // Wall starts moving and score begins counting exactly when bounce finishes
+      this.wallManager.startScrolling();
+      this.isScoringActive = true;
+    });
     this.playContainer.add(this.marble);
 
-    // 3. Invisible Outer Touch Zones
+    // 3. Rounded Score Display in Top Right Corner (same rounded font as Title)
+    const fontStack = '"Quicksand", "Nunito", "ui-rounded", -apple-system, BlinkMacSystemFont, sans-serif';
+    this.scoreText = this.add.text(width - 42, 46, '0', {
+      fontFamily: fontStack,
+      fontSize: '52px',
+      fontStyle: '900',
+      color: '#fdf6e7',
+      stroke: '#3a2415',
+      strokeThickness: 4,
+      align: 'right',
+    });
+    this.scoreText.setOrigin(1, 0);
+    this.scoreText.setDepth(50);
+    this.playContainer.add(this.scoreText);
+
+    // 4. Invisible Outer Touch Zones
     this.createTouchZones(width, barCenterY);
 
-    // 4. Global Pointer Movement and Release Handlers
+    // 5. Global Pointer Movement and Release Handlers
     this.setupGlobalPointerListeners();
 
-    // 5. Game Over Modal Overlay
+    // 6. Game Over Modal Overlay
     this.gameOverModal = new GameOverModal(this);
 
-    // 6. Upward arrival transition when entering from title screen
+    // 7. Upward arrival transition when entering from title screen
     if (this.fromTitle) {
       const offscreenBottomY = height + BAR_CONFIG.barHeight + 60;
       this.barContainer.y = offscreenBottomY;
@@ -155,7 +184,7 @@ export class MainScene extends Phaser.Scene {
         ease: 'Cubic.easeOut',
       });
     } else {
-      this.marble.resetToCenter(barCenterX, barCenterY, 0, BAR_CONFIG.barHeight);
+      this.marble.resetToCenter(barCenterX, barCenterY, 0, BAR_CONFIG.barHeight, true);
     }
 
     // Subscribe to dynamic theme switches for the bar
@@ -318,7 +347,7 @@ export class MainScene extends Phaser.Scene {
     }
 
     // 2. Update wall obstacles and speed gauge progression
-    this.wallManager.updateWall(dt, height);
+    this.wallManager.updateWall(dt, height, barCenterY);
 
     // 3. Update marble physics and rolling dynamics
     this.marble.updatePhysics(
@@ -341,6 +370,28 @@ export class MainScene extends Phaser.Scene {
         const center = this.wallManager.getHoleScreenCenter(hole);
         this.marble.startHoleFall(center);
         this.wallManager.stopScrolling();
+        this.isScoringActive = false;
+      }
+    }
+
+    // 5. Update scoring time while marble is actively in play
+    if (this.isScoringActive) {
+      if (this.marble.getMarbleState() === MarbleState.ROLLING) {
+        this.elapsedPlayingTime += dt;
+        const newScore = Math.floor(this.elapsedPlayingTime);
+        if (newScore !== this.score) {
+          this.score = newScore;
+          this.scoreText.setText(this.score.toString());
+          this.tweens.add({
+            targets: this.scoreText,
+            scale: { from: 1.18, to: 1.0 },
+            duration: 150,
+            ease: 'Quad.easeOut',
+          });
+        }
+      } else {
+        // Stopped rolling (e.g. falling off bar or into hole)
+        this.isScoringActive = false;
       }
     }
   }
@@ -354,7 +405,8 @@ export class MainScene extends Phaser.Scene {
     if (this.isGameOverActive) return;
     this.isGameOverActive = true;
 
-    // Stop wall motion immediately
+    // Stop scoring and wall motion immediately
+    this.isScoringActive = false;
     this.wallManager.stopScrolling();
 
     // Release all active touch pointers
@@ -370,8 +422,9 @@ export class MainScene extends Phaser.Scene {
       this.playContainer.postFX.addBlur(2, 4, 4, 2);
     }
 
-    // Display Game Over Modal
+    // Display Game Over Modal with current run score
     this.gameOverModal.show(
+      this.score,
       () => this.handleTryAgain(),
       () => this.handleMainMenu()
     );
@@ -396,18 +449,24 @@ export class MainScene extends Phaser.Scene {
     }
 
     this.gameOverModal.hide(() => {
+      // Reset score state
+      this.score = 0;
+      this.elapsedPlayingTime = 0;
+      this.isScoringActive = false;
+      this.scoreText.setText('0');
+
       // Reset bar rotation state
       this.currentAngleRad = 0;
       this.targetAngleRad = 0;
       this.angularVelocity = 0;
       this.barContainer.setRotation(0);
 
-      // Reset wall obstacles and restart scrolling
+      // Reset wall obstacles and pregenerate stationary obstacles
       this.wallManager.reset();
-      this.wallManager.startSpawning();
+      this.wallManager.pregenerate(height, barCenterY);
 
-      // Reset marble on top of the bar
-      this.marble.resetToCenter(barCenterX, barCenterY, 0, BAR_CONFIG.barHeight);
+      // Reset marble on top of the bar with gentle bounce animation
+      this.marble.resetToCenter(barCenterX, barCenterY, 0, BAR_CONFIG.barHeight, true);
       this.isGameOverActive = false;
     });
   }
@@ -434,6 +493,11 @@ export class MainScene extends Phaser.Scene {
     this.leftPointerId = null;
     this.rightPointerId = null;
     this.barContainer.setRotation(0);
+
+    // Reset score state
+    this.score = 0;
+    this.elapsedPlayingTime = 0;
+    this.isScoringActive = false;
 
     this.gameOverModal.hide(() => {
       this.scene.start('TitleScene');

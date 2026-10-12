@@ -5,6 +5,7 @@
 export const WALL_CONFIG = {
   // Motion & Speed
   scrollSpeed: 70, // Pixels per second (downward mountain wall progression)
+  barYRatio: 0.885, // Vertical ratio of the bar center for precise tick synchronization (matches BAR_CONFIG)
 
   // Tick Marks (Speed Gauge along left and right edges)
   tickSpacing: 70, // Pixels between ticks (exactly 1 tick mark passes bar every second at 70px/s)

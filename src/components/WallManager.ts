@@ -40,6 +40,7 @@ export class WallManager extends Phaser.GameObjects.Container {
   private holes: Hole[] = [];
   private unsubscribeTheme?: () => void;
   private nextHoleId: number = 1;
+  private barCenterY?: number;
 
   constructor(scene: Phaser.Scene) {
     super(scene, 0, 0);
@@ -74,19 +75,35 @@ export class WallManager extends Phaser.GameObjects.Container {
    * Generates a dense, organic obstacle field starting halfway down the screen with
    * immediate obstacles in the center requiring player action.
    */
-  public startSpawning(): void {
+  public pregenerate(screenHeight?: number, barCenterY?: number): void {
+    if (this.holes.length > 0) return;
+    const h = screenHeight ?? this.scene.scale.height;
+    if (barCenterY !== undefined) {
+      this.barCenterY = barCenterY;
+    }
+    this.highestGeneratedY = h * (WALL_CONFIG.initialBottomRatio ?? 0.58);
+    this.corridorWaypoints = [];
+    this.swingCountSinceCenter = 0;
+    this.wallOffsetY = 0;
+    // Pre-generate dense continuous obstacle field upward past the top of viewport
+    this.generateUpTo(-450);
+    this.renderAll(h);
+  }
+
+  /**
+   * Starts downward wall progression.
+   */
+  public startScrolling(): void {
     if (this.isScrolling) return;
     this.isScrolling = true;
+  }
 
-    if (this.holes.length === 0) {
-      const h = this.scene.scale.height;
-      this.highestGeneratedY = h * (WALL_CONFIG.initialBottomRatio ?? 0.58);
-      this.corridorWaypoints = [];
-      this.swingCountSinceCenter = 0;
-      // Pre-generate dense continuous obstacle field upward past the top of viewport
-      this.generateUpTo(-450);
-      this.renderAll(h);
-    }
+  /**
+   * Starts spawning and scrolling immediately (convenience method).
+   */
+  public startSpawning(): void {
+    this.pregenerate();
+    this.startScrolling();
   }
 
   /**
@@ -649,7 +666,10 @@ export class WallManager extends Phaser.GameObjects.Container {
   /**
    * Main per-frame update loop called from MainScene.
    */
-  public updateWall(dt: number, screenHeight: number): void {
+  public updateWall(dt: number, screenHeight: number, barCenterY?: number): void {
+    if (barCenterY !== undefined) {
+      this.barCenterY = barCenterY;
+    }
     if (this.isScrolling) {
       this.wallOffsetY += WALL_CONFIG.scrollSpeed * dt;
 
@@ -689,17 +709,21 @@ export class WallManager extends Phaser.GameObjects.Container {
     }
 
     // 2. Draw Speed Gauge Tick Marks along left and right edges
+    // Synchronized with score: at wallOffsetY = 0, tick 0 is directly at barCenterY.
+    // Each integer second (70px of scroll), the next tick passes the bar in exact lockstep with the score.
     this.ticksGraphics.clear();
     const tickSpacing = WALL_CONFIG.tickSpacing;
-    const offsetMod = this.wallOffsetY % tickSpacing;
+    const barCenterY = this.barCenterY ?? screenHeight * (WALL_CONFIG.barYRatio ?? 0.885);
 
-    const baseTickIndex = Math.floor(this.wallOffsetY / tickSpacing);
-    const startY = -tickSpacing + offsetMod;
+    const phaseY =
+      (((barCenterY + (this.wallOffsetY % tickSpacing)) % tickSpacing) + tickSpacing) % tickSpacing;
+    const startY = phaseY - tickSpacing;
 
-    let tickCount = 0;
     for (let y = startY; y <= screenHeight + tickSpacing; y += tickSpacing) {
-      const currentTickIdx = baseTickIndex - tickCount;
-      const isMajor = Math.abs(currentTickIdx) % WALL_CONFIG.tickMajorInterval === 0;
+      // Calculate tick index relative to the bar:
+      // When y === barCenterY, tickIndex is exactly round(wallOffsetY / tickSpacing)
+      const tickIndex = Math.round((this.wallOffsetY + barCenterY - y) / tickSpacing);
+      const isMajor = Math.abs(tickIndex) % WALL_CONFIG.tickMajorInterval === 0;
       const length = isMajor ? WALL_CONFIG.tickMajorLength : WALL_CONFIG.tickMinorLength;
 
       // Left speed gauge (extends right into screen)
@@ -707,8 +731,6 @@ export class WallManager extends Phaser.GameObjects.Container {
 
       // Right speed gauge (extends left into screen)
       theme.drawTick(this.ticksGraphics, WALL_CONFIG.tickRightX, y, length, -1, isMajor);
-
-      tickCount++;
     }
   }
 
