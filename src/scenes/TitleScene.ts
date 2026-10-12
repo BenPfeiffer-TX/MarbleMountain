@@ -2,6 +2,8 @@ import Phaser from 'phaser';
 import { createTactileButton } from '../ui/TactileButton';
 import { createTriangleButton } from '../ui/TriangleButton';
 import { ThemeManager } from '../themes/themeManager';
+import { MarbleTheme } from '../themes/types';
+import { MARBLE_CONFIG } from '../config/marbleConfig';
 
 /**
  * TUNABLE TITLE SCREEN CONFIGURATION
@@ -127,7 +129,7 @@ export class TitleScene extends Phaser.Scene {
     const fontStack = '"Quicksand", "Nunito", "ui-rounded", -apple-system, BlinkMacSystemFont, sans-serif';
 
     // 1. Options Header
-    const header = this.add.text(width / 2, 160, 'Options', {
+    const header = this.add.text(width / 2, 170, 'Options', {
       fontFamily: fontStack,
       fontSize: '56px',
       fontStyle: '900',
@@ -138,132 +140,191 @@ export class TitleScene extends Phaser.Scene {
     this.optionsContainer.add(header);
 
     const centerX = width / 2;
+    // Identical horizontal spacing from center across ALL options
+    const TRI_SPACING = 80;
 
-    // Helper to build each texture selection option row
-    const createOptionRow = (
-      labelStr: string,
-      initialValueStr: string,
-      rowY: number,
-      onCycle: (dir: 1 | -1) => string
-    ) => {
-      // 1. Category label
-      const catLabel = this.add.text(centerX, rowY, labelStr, {
-        fontFamily: fontStack,
-        fontSize: '18px',
-        fontStyle: '800',
-        color: '#7c5e47',
-        letterSpacing: 3,
-        align: 'center',
-      });
-      catLabel.setOrigin(0.5);
-      this.optionsContainer.add(catLabel);
+    // --- Row 1: Background ---
+    const bgRowY = 290;
+    const bgBtnY = 350;
 
-      // 2. Value display badge card
-      const badgeW = 340;
-      const badgeH = 58;
-      const badgeR = 16;
-      const badgeY = rowY + 48;
+    const bgLabel = this.add.text(centerX, bgRowY, 'BACKGROUND', {
+      fontFamily: fontStack,
+      fontSize: '20px',
+      fontStyle: '800',
+      color: '#7c5e47',
+      letterSpacing: 4,
+      align: 'center',
+    });
+    bgLabel.setOrigin(0.5);
+    this.optionsContainer.add(bgLabel);
 
-      const badgeContainer = this.add.container(centerX, badgeY);
+    const bgLeftBtn = createTriangleButton(this, {
+      x: centerX - TRI_SPACING,
+      y: bgBtnY,
+      direction: 'left',
+      size: 44,
+      onPointerDown: () => ThemeManager.cycleBackground(-1),
+    });
 
-      // Shadow
-      const badgeShadow = this.add.graphics();
-      badgeShadow.fillStyle(0x3a2c1d, 0.14);
-      badgeShadow.fillRoundedRect(-badgeW / 2, -badgeH / 2 + 3, badgeW, badgeH, badgeR);
-      badgeContainer.add(badgeShadow);
+    const bgRightBtn = createTriangleButton(this, {
+      x: centerX + TRI_SPACING,
+      y: bgBtnY,
+      direction: 'right',
+      size: 44,
+      onPointerDown: () => ThemeManager.cycleBackground(1),
+    });
 
-      // Inset plate
-      const badgeBg = this.add.graphics();
-      badgeBg.fillStyle(0xfdfaf4, 0.92);
-      badgeBg.fillRoundedRect(-badgeW / 2, -badgeH / 2, badgeW, badgeH, badgeR);
-      badgeBg.lineStyle(1.5, 0x9c6638, 0.35);
-      badgeBg.strokeRoundedRect(-badgeW / 2, -badgeH / 2, badgeW, badgeH, badgeR);
-      badgeContainer.add(badgeBg);
+    this.optionsContainer.add([bgLeftBtn, bgRightBtn]);
 
-      // Text label
-      const valueText = this.add.text(0, 0, initialValueStr, {
-        fontFamily: fontStack,
-        fontSize: '24px',
-        fontStyle: '900',
-        color: '#3a2415',
-        align: 'center',
-      });
-      valueText.setOrigin(0.5);
-      badgeContainer.add(valueText);
+    // --- Row 2: Ball ---
+    const ballRowY = 470;
+    const ballBtnY = 530;
 
-      this.optionsContainer.add(badgeContainer);
+    const ballLabel = this.add.text(centerX, ballRowY, 'BALL', {
+      fontFamily: fontStack,
+      fontSize: '20px',
+      fontStyle: '800',
+      color: '#7c5e47',
+      letterSpacing: 4,
+      align: 'center',
+    });
+    ballLabel.setOrigin(0.5);
+    this.optionsContainer.add(ballLabel);
 
-      // 3. Two Triangle Buttons (using active Bar texture) directly UNDER each option
-      const triBtnY = badgeY + 62;
-      const triSpacing = 68; // Horizontal offset from center
+    // Marble Preview placed directly in between the buttons
+    const marbleRadius = MARBLE_CONFIG.radius;
+    const marbleContainer = this.add.container(centerX, ballBtnY);
 
-      const leftBtn = createTriangleButton(this, {
-        x: centerX - triSpacing,
-        y: triBtnY,
-        direction: 'left',
-        size: 44,
-        onPointerDown: () => {
-          const nextName = onCycle(-1);
-          valueText.setText(nextName);
-          this.tweens.add({
-            targets: valueText,
-            scale: { from: 1.15, to: 1.0 },
-            duration: 160,
-            ease: 'Back.easeOut',
-          });
-        },
-      });
+    const marbleShadow = this.add.graphics();
+    marbleContainer.add(marbleShadow);
 
-      const rightBtn = createTriangleButton(this, {
-        x: centerX + triSpacing,
-        y: triBtnY,
-        direction: 'right',
-        size: 44,
-        onPointerDown: () => {
-          const nextName = onCycle(1);
-          valueText.setText(nextName);
-          this.tweens.add({
-            targets: valueText,
-            scale: { from: 1.15, to: 1.0 },
-            duration: 160,
-            ease: 'Back.easeOut',
-          });
-        },
-      });
+    const marbleBody = this.add.image(0, 0, '');
+    marbleContainer.add(marbleBody);
 
-      this.optionsContainer.add([leftBtn, rightBtn]);
+    let marbleOverlay: Phaser.GameObjects.Image | null = null;
 
-      return { valueText };
+    const updateMarbleVisual = (marbleTheme: MarbleTheme, dir: number = 0) => {
+      // 1. Drop shadow
+      marbleShadow.clear();
+      marbleTheme.drawShadow(marbleShadow, marbleRadius);
+
+      // 2. Base body texture (Layer 1)
+      const baseKey = marbleTheme.ensureBaseTexture
+        ? marbleTheme.ensureBaseTexture(this.textures, marbleRadius)
+        : marbleTheme.ensureTexture!(this.textures, marbleRadius);
+      marbleBody.setTexture(baseKey);
+
+      const shouldRotate = marbleTheme.rotatesBody ?? marbleTheme.rotatesTexture ?? false;
+      if (shouldRotate && dir !== 0) {
+        this.tweens.add({
+          targets: marbleBody,
+          rotation: marbleBody.rotation + dir * (Math.PI * 0.5),
+          duration: 220,
+          ease: 'Cubic.easeOut',
+        });
+      } else if (!shouldRotate) {
+        marbleBody.setRotation(0);
+      }
+
+      // 3. Specular overlay texture (Layer 2)
+      const overlayKey = marbleTheme.ensureOverlayTexture
+        ? marbleTheme.ensureOverlayTexture(this.textures, marbleRadius)
+        : null;
+
+      if (overlayKey) {
+        if (!marbleOverlay) {
+          marbleOverlay = this.add.image(0, 0, overlayKey);
+          marbleContainer.add(marbleOverlay);
+        } else {
+          marbleOverlay.setTexture(overlayKey);
+          marbleOverlay.setVisible(true);
+        }
+      } else if (marbleOverlay) {
+        marbleOverlay.setVisible(false);
+      }
     };
 
-    // Row 1: Background
-    createOptionRow(
-      'BACKGROUND',
-      ThemeManager.getActiveBackground().name,
-      250,
-      (dir) => ThemeManager.cycleBackground(dir).name
-    );
+    updateMarbleVisual(ThemeManager.getActiveBall());
 
-    // Row 2: Ball
-    createOptionRow(
-      'BALL',
-      ThemeManager.getActiveBall().name,
-      450,
-      (dir) => ThemeManager.cycleBall(dir).name
-    );
+    const unsubBall = ThemeManager.onBallChanged((ball) => {
+      updateMarbleVisual(ball);
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      unsubBall();
+    });
 
-    // Row 3: Surface (Bar)
-    createOptionRow(
-      'SURFACE',
-      ThemeManager.getActiveSurfacePackage().name,
-      650,
-      (dir) => ThemeManager.cycleSurface(dir).name
-    );
+    const onCycleBall = (dir: 1 | -1) => {
+      const nextBall = ThemeManager.cycleBall(dir);
+      updateMarbleVisual(nextBall, dir);
+      this.tweens.add({
+        targets: marbleContainer,
+        scale: { from: 1.18, to: 1.0 },
+        duration: 180,
+        ease: 'Back.easeOut',
+      });
+    };
+
+    // Interactive touch zone for marble preview
+    const marbleTouch = this.add.zone(0, 0, marbleRadius * 2 + 16, marbleRadius * 2 + 16);
+    marbleTouch.setInteractive({ useHandCursor: true });
+    marbleTouch.on('pointerdown', () => onCycleBall(1));
+    marbleContainer.add(marbleTouch);
+
+    const ballLeftBtn = createTriangleButton(this, {
+      x: centerX - TRI_SPACING,
+      y: ballBtnY,
+      direction: 'left',
+      size: 44,
+      onPointerDown: () => onCycleBall(-1),
+    });
+
+    const ballRightBtn = createTriangleButton(this, {
+      x: centerX + TRI_SPACING,
+      y: ballBtnY,
+      direction: 'right',
+      size: 44,
+      onPointerDown: () => onCycleBall(1),
+    });
+
+    this.optionsContainer.add([marbleContainer, ballLeftBtn, ballRightBtn]);
+
+    // --- Row 3: Surface ---
+    const surfRowY = 650;
+    const surfBtnY = 710;
+
+    const surfLabel = this.add.text(centerX, surfRowY, 'SURFACE', {
+      fontFamily: fontStack,
+      fontSize: '20px',
+      fontStyle: '800',
+      color: '#7c5e47',
+      letterSpacing: 4,
+      align: 'center',
+    });
+    surfLabel.setOrigin(0.5);
+    this.optionsContainer.add(surfLabel);
+
+    const surfLeftBtn = createTriangleButton(this, {
+      x: centerX - TRI_SPACING,
+      y: surfBtnY,
+      direction: 'left',
+      size: 44,
+      onPointerDown: () => ThemeManager.cycleSurface(-1),
+    });
+
+    const surfRightBtn = createTriangleButton(this, {
+      x: centerX + TRI_SPACING,
+      y: surfBtnY,
+      direction: 'right',
+      size: 44,
+      onPointerDown: () => ThemeManager.cycleSurface(1),
+    });
+
+    this.optionsContainer.add([surfLeftBtn, surfRightBtn]);
 
     // Back Button (tactile squircle)
     const backButton = createTactileButton(this, {
       x: centerX,
-      y: 870,
+      y: 860,
       w: 240,
       h: 68,
       radius: TITLE_CONFIG.buttonRadius,
