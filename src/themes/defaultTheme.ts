@@ -252,68 +252,7 @@ export const classicWoodHoleTheme: HoleTheme = {
   innerShadowColor: 0x000000,
   tickColor: 0x8b6544,
 
-  drawRectHole(
-    g: Phaser.GameObjects.Graphics,
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    cornerRadius: number = 10
-  ): void {
-    // 1. Deep pitch black pit interior
-    g.fillStyle(0x050507, 1.0);
-    g.fillRoundedRect(x, y, width, height, cornerRadius);
-
-    // 2. Soft inner ambient occlusion shadow along top-left rim (simulates carved wall depth)
-    g.fillStyle(0x000000, 0.45);
-    g.fillRoundedRect(x + 2.5, y + 2.5, width - 5, Math.min(14, height * 0.28), Math.max(2, cornerRadius - 2));
-
-    // 3. Thick warm wood border matching the bar and buttons
-    g.lineStyle(4.5, 0x9c6638, 1.0);
-    g.strokeRoundedRect(x, y, width, height, cornerRadius);
-
-    // 4. Outer dark contour bevel for tactile 3D punch against the background
-    g.lineStyle(1.5, 0x5a3617, 0.55);
-    g.strokeRoundedRect(x - 1, y - 1, width + 2, height + 2, cornerRadius + 1);
-
-    // 5. Subtle top-edge lighter highlight for 3D wood bevel effect
-    g.lineStyle(1.5, 0xb57c4c, 0.65);
-    g.beginPath();
-    g.moveTo(x + cornerRadius, y);
-    g.lineTo(x + width - cornerRadius, y);
-    g.strokePath();
-  },
-
-  drawTriHole(
-    g: Phaser.GameObjects.Graphics,
-    p1: { x: number; y: number },
-    p2: { x: number; y: number },
-    p3: { x: number; y: number }
-  ): void {
-    // 1. Deep pitch black pit interior
-    g.fillStyle(0x050507, 1.0);
-    g.beginPath();
-    g.moveTo(p1.x, p1.y);
-    g.lineTo(p2.x, p2.y);
-    g.lineTo(p3.x, p3.y);
-    g.closePath();
-    g.fillPath();
-
-    // 2. Thick warm wood border matching the bar and buttons
-    g.lineStyle(4.5, 0x9c6638, 1.0);
-    g.beginPath();
-    g.moveTo(p1.x, p1.y);
-    g.lineTo(p2.x, p2.y);
-    g.lineTo(p3.x, p3.y);
-    g.closePath();
-    g.strokePath();
-
-    // 3. Outer dark contour bevel
-    g.lineStyle(1.5, 0x5a3617, 0.55);
-    g.strokePath();
-  },
-
-  drawCircleHole(
+  drawCircleFill(
     g: Phaser.GameObjects.Graphics,
     cx: number,
     cy: number,
@@ -330,23 +269,30 @@ export const classicWoodHoleTheme: HoleTheme = {
     g.arc(cx, cy + 4, radius - 5, 2 * Math.PI, Math.PI, true);
     g.closePath();
     g.fillPath();
+  },
 
-    // 3. Thick warm wood border matching the bar and buttons
+  drawCircleBorder(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+    radius: number
+  ): void {
+    // Layer 1: Dark outer contour bevel (6.5px total width, 1.0px margin extending beyond wood core)
+    g.lineStyle(6.5, 0x5a3617, 0.70);
+    g.strokeCircle(cx, cy, radius);
+
+    // Layer 2: Thick warm wood core matching the bar and buttons
     g.lineStyle(4.5, 0x9c6638, 1.0);
     g.strokeCircle(cx, cy, radius);
 
-    // 4. Outer dark contour bevel
-    g.lineStyle(1.5, 0x5a3617, 0.55);
-    g.strokeCircle(cx, cy, radius + 1);
-
-    // 5. Subtle top-edge lighter highlight
-    g.lineStyle(1.5, 0xb57c4c, 0.65);
+    // Layer 3: Subtle top-edge lighter highlight
+    g.lineStyle(1.4, 0xb57c4c, 0.65);
     g.beginPath();
     g.arc(cx, cy, radius, -Math.PI * 0.75, -Math.PI * 0.25, false);
     g.strokePath();
   },
 
-  drawPolygonHole(
+  drawPolygonFill(
     g: Phaser.GameObjects.Graphics,
     points: { x: number; y: number }[]
   ): void {
@@ -361,20 +307,91 @@ export const classicWoodHoleTheme: HoleTheme = {
     }
     g.closePath();
     g.fillPath();
+  },
 
-    // 2. Thick warm wood border matching the bar and buttons
+  drawPolygonBorder(
+    g: Phaser.GameObjects.Graphics,
+    points: { x: number; y: number }[]
+  ): void {
+    if (points.length < 3) return;
+
+    const trace = () => {
+      g.beginPath();
+      g.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        g.lineTo(points[i].x, points[i].y);
+      }
+      g.closePath();
+    };
+
+    // Layer 1: Dark outer contour bevel (6.5px total width, 1.0px margin extending beyond wood core)
+    g.lineStyle(6.5, 0x5a3617, 0.70);
+    trace();
+    g.strokePath();
+
+    // Layer 2: Thick warm wood core matching the bar and buttons
     g.lineStyle(4.5, 0x9c6638, 1.0);
-    g.beginPath();
-    g.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      g.lineTo(points[i].x, points[i].y);
-    }
-    g.closePath();
+    trace();
     g.strokePath();
+  },
 
-    // 3. Outer dark contour bevel
-    g.lineStyle(1.5, 0x5a3617, 0.55);
+  drawRectHole(
+    g: Phaser.GameObjects.Graphics,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    cornerRadius: number = 10
+  ): void {
+    // 1. Deep pitch black pit interior
+    g.fillStyle(0x050507, 1.0);
+    g.fillRoundedRect(x, y, width, height, cornerRadius);
+
+    // 2. Soft inner ambient occlusion shadow along top-left rim
+    g.fillStyle(0x000000, 0.45);
+    g.fillRoundedRect(x + 2.5, y + 2.5, width - 5, Math.min(14, height * 0.28), Math.max(2, cornerRadius - 2));
+
+    // 3. Composite Border: Layer 1 outer bevel, Layer 2 wood core
+    g.lineStyle(6.5, 0x5a3617, 0.70);
+    g.strokeRoundedRect(x, y, width, height, cornerRadius);
+
+    g.lineStyle(4.5, 0x9c6638, 1.0);
+    g.strokeRoundedRect(x, y, width, height, cornerRadius);
+
+    // 4. Subtle top-edge lighter highlight for 3D wood bevel effect
+    g.lineStyle(1.4, 0xb57c4c, 0.65);
+    g.beginPath();
+    g.moveTo(x + cornerRadius, y);
+    g.lineTo(x + width - cornerRadius, y);
     g.strokePath();
+  },
+
+  drawTriHole(
+    g: Phaser.GameObjects.Graphics,
+    p1: { x: number; y: number },
+    p2: { x: number; y: number },
+    p3: { x: number; y: number }
+  ): void {
+    this.drawPolygonFill(g, [p1, p2, p3]);
+    this.drawPolygonBorder(g, [p1, p2, p3]);
+  },
+
+  drawCircleHole(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+    radius: number
+  ): void {
+    this.drawCircleFill(g, cx, cy, radius);
+    this.drawCircleBorder(g, cx, cy, radius);
+  },
+
+  drawPolygonHole(
+    g: Phaser.GameObjects.Graphics,
+    points: { x: number; y: number }[]
+  ): void {
+    this.drawPolygonFill(g, points);
+    this.drawPolygonBorder(g, points);
   },
 
   drawTick(

@@ -137,6 +137,29 @@ export interface HoleTheme {
     points: { x: number; y: number }[]
   ): void;
   /**
+   * Two-pass rendering methods for perfectly uniform borders without overdraw clipping.
+   */
+  drawCircleFill(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+    radius: number
+  ): void;
+  drawCircleBorder(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+    radius: number
+  ): void;
+  drawPolygonFill(
+    g: Phaser.GameObjects.Graphics,
+    points: { x: number; y: number }[]
+  ): void;
+  drawPolygonBorder(
+    g: Phaser.GameObjects.Graphics,
+    points: { x: number; y: number }[]
+  ): void;
+  /**
    * Draws an altitude tick mark on the speed gauge.
    */
   drawTick(

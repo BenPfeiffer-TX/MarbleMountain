@@ -9,7 +9,8 @@ import {
   createEllipseHole,
   createBeanHole,
   isPointInHole,
-  renderHole,
+  renderHoleFill,
+  renderHoleBorder,
 } from './wallShapes';
 
 export type { Hole };
@@ -653,6 +654,8 @@ export class WallManager extends Phaser.GameObjects.Container {
 
       if (
         candidate &&
+        candidate.minX >= 10 &&
+        candidate.maxX <= 710 &&
         this.isHoleSafeFromCorridor(candidate) &&
         !this.doesHoleOverlapExisting(candidate)
       ) {
@@ -698,14 +701,24 @@ export class WallManager extends Phaser.GameObjects.Container {
   private renderAll(screenHeight: number = 1280): void {
     const theme = ThemeManager.getActiveTheme().hole;
 
-    // 1. Draw Visible Holes
+    // 1. Draw Visible Holes in Two Passes to completely eliminate overdraw clipping
     this.holesGraphics.clear();
+    const visibleHoles: Hole[] = [];
     for (const hole of this.holes) {
       const screenMinY = hole.minY + this.wallOffsetY;
       const screenMaxY = hole.maxY + this.wallOffsetY;
       if (screenMaxY < -100 || screenMinY > screenHeight + 100) continue;
+      visibleHoles.push(hole);
+    }
 
-      renderHole(this.holesGraphics, theme, hole, this.wallOffsetY);
+    // Pass 1: Render all abyss fills first
+    for (const hole of visibleHoles) {
+      renderHoleFill(this.holesGraphics, theme, hole, this.wallOffsetY);
+    }
+
+    // Pass 2: Render all themed composite borders on top of fills
+    for (const hole of visibleHoles) {
+      renderHoleBorder(this.holesGraphics, theme, hole, this.wallOffsetY);
     }
 
     // 2. Draw Speed Gauge Tick Marks along left and right edges

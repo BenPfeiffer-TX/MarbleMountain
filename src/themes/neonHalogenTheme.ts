@@ -162,6 +162,81 @@ export const neonHalogenHoleTheme: HoleTheme = {
   innerShadowColor: 0x000000,
   tickColor: 0x39ff14,
 
+  drawCircleFill(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+    radius: number
+  ): void {
+    // Deep pitch black pit interior
+    g.fillStyle(0x020803, 1.0);
+    g.fillCircle(cx, cy, radius);
+  },
+
+  drawCircleBorder(
+    g: Phaser.GameObjects.Graphics,
+    cx: number,
+    cy: number,
+    radius: number
+  ): void {
+    // Layer 1: Radiant diffuse neon aura (9px wide)
+    g.lineStyle(9.0, 0x22c55e, 0.35);
+    g.strokeCircle(cx, cy, radius);
+
+    // Layer 2: Sharp electric neon green core (4.5px wide)
+    g.lineStyle(4.5, 0x39ff14, 1.0);
+    g.strokeCircle(cx, cy, radius);
+
+    // Layer 3: Subtle top-edge neon crescent highlight
+    g.lineStyle(1.8, 0x86efac, 0.85);
+    g.beginPath();
+    g.arc(cx, cy, radius, -Math.PI * 0.75, -Math.PI * 0.25, false);
+    g.strokePath();
+  },
+
+  drawPolygonFill(
+    g: Phaser.GameObjects.Graphics,
+    points: { x: number; y: number }[]
+  ): void {
+    if (points.length < 3) return;
+
+    // Deep pitch black pit interior
+    g.fillStyle(0x020803, 1.0);
+    g.beginPath();
+    g.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) {
+      g.lineTo(points[i].x, points[i].y);
+    }
+    g.closePath();
+    g.fillPath();
+  },
+
+  drawPolygonBorder(
+    g: Phaser.GameObjects.Graphics,
+    points: { x: number; y: number }[]
+  ): void {
+    if (points.length < 3) return;
+
+    const trace = () => {
+      g.beginPath();
+      g.moveTo(points[0].x, points[0].y);
+      for (let i = 1; i < points.length; i++) {
+        g.lineTo(points[i].x, points[i].y);
+      }
+      g.closePath();
+    };
+
+    // Layer 1: Radiant diffuse neon aura (9px wide)
+    g.lineStyle(9.0, 0x22c55e, 0.35);
+    trace();
+    g.strokePath();
+
+    // Layer 2: Sharp electric neon green core (4.5px wide)
+    g.lineStyle(4.5, 0x39ff14, 1.0);
+    trace();
+    g.strokePath();
+  },
+
   drawRectHole(
     g: Phaser.GameObjects.Graphics,
     x: number,
@@ -174,16 +249,16 @@ export const neonHalogenHoleTheme: HoleTheme = {
     g.fillStyle(0x020803, 1.0);
     g.fillRoundedRect(x, y, width, height, cornerRadius);
 
-    // 2. Outer luminous neon green aura
-    g.lineStyle(8, 0x22c55e, 0.25);
-    g.strokeRoundedRect(x - 2, y - 2, width + 4, height + 4, cornerRadius + 2);
+    // 2. Radiant diffuse neon aura (9px wide)
+    g.lineStyle(9.0, 0x22c55e, 0.35);
+    g.strokeRoundedRect(x, y, width, height, cornerRadius);
 
-    // 3. Sharp electric neon green border
+    // 3. Sharp electric neon green core (4.5px wide)
     g.lineStyle(4.5, 0x39ff14, 1.0);
     g.strokeRoundedRect(x, y, width, height, cornerRadius);
 
     // 4. Inner bright lime highlight along top edge
-    g.lineStyle(1.6, 0x86efac, 0.85);
+    g.lineStyle(1.8, 0x86efac, 0.85);
     g.beginPath();
     g.moveTo(x + cornerRadius, y + 1);
     g.lineTo(x + width - cornerRadius, y + 1);
@@ -196,22 +271,8 @@ export const neonHalogenHoleTheme: HoleTheme = {
     p2: { x: number; y: number },
     p3: { x: number; y: number }
   ): void {
-    // 1. Deep pitch black pit interior
-    g.fillStyle(0x020803, 1.0);
-    g.beginPath();
-    g.moveTo(p1.x, p1.y);
-    g.lineTo(p2.x, p2.y);
-    g.lineTo(p3.x, p3.y);
-    g.closePath();
-    g.fillPath();
-
-    // 2. Outer luminous neon aura
-    g.lineStyle(8, 0x22c55e, 0.25);
-    g.strokePath();
-
-    // 3. Sharp electric neon green border
-    g.lineStyle(4.5, 0x39ff14, 1.0);
-    g.strokePath();
+    this.drawPolygonFill(g, [p1, p2, p3]);
+    this.drawPolygonBorder(g, [p1, p2, p3]);
   },
 
   drawCircleHole(
@@ -220,48 +281,16 @@ export const neonHalogenHoleTheme: HoleTheme = {
     cy: number,
     radius: number
   ): void {
-    // 1. Deep pitch black pit interior
-    g.fillStyle(0x020803, 1.0);
-    g.fillCircle(cx, cy, radius);
-
-    // 2. Outer luminous neon aura
-    g.lineStyle(8, 0x22c55e, 0.25);
-    g.strokeCircle(cx, cy, radius + 2);
-
-    // 3. Sharp electric neon green border
-    g.lineStyle(4.5, 0x39ff14, 1.0);
-    g.strokeCircle(cx, cy, radius);
-
-    // 4. Subtle top-edge neon crescent highlight
-    g.lineStyle(1.8, 0x86efac, 0.85);
-    g.beginPath();
-    g.arc(cx, cy, radius, -Math.PI * 0.75, -Math.PI * 0.25, false);
-    g.strokePath();
+    this.drawCircleFill(g, cx, cy, radius);
+    this.drawCircleBorder(g, cx, cy, radius);
   },
 
   drawPolygonHole(
     g: Phaser.GameObjects.Graphics,
     points: { x: number; y: number }[]
   ): void {
-    if (points.length < 3) return;
-
-    // 1. Deep pitch black pit interior
-    g.fillStyle(0x020803, 1.0);
-    g.beginPath();
-    g.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < points.length; i++) {
-      g.lineTo(points[i].x, points[i].y);
-    }
-    g.closePath();
-    g.fillPath();
-
-    // 2. Outer luminous neon aura
-    g.lineStyle(8, 0x22c55e, 0.25);
-    g.strokePath();
-
-    // 3. Sharp electric neon green border
-    g.lineStyle(4.5, 0x39ff14, 1.0);
-    g.strokePath();
+    this.drawPolygonFill(g, points);
+    this.drawPolygonBorder(g, points);
   },
 
   drawTick(

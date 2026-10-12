@@ -438,7 +438,61 @@ export function isPointInHole(
 }
 
 /**
- * Dispatches hole rendering with theme-textured border and deep abyss interior.
+ * Dispatches hole abyss interior fill rendering (Pass 1).
+ */
+export function renderHoleFill(
+  g: Phaser.GameObjects.Graphics,
+  theme: HoleTheme,
+  hole: Hole,
+  offsetY: number
+): void {
+  if (hole.type === 'circle') {
+    theme.drawCircleFill(g, hole.cx, hole.cy + offsetY, hole.radius);
+  } else if (hole.type === 'tri') {
+    theme.drawPolygonFill(g, [
+      { x: hole.p1.x, y: hole.p1.y + offsetY },
+      { x: hole.p2.x, y: hole.p2.y + offsetY },
+      { x: hole.p3.x, y: hole.p3.y + offsetY },
+    ]);
+  } else {
+    // Rect, Ellipse, Bean all provide world-space polygon vertices
+    const shiftedPts = hole.polygon.map((pt) => ({
+      x: pt.x,
+      y: pt.y + offsetY,
+    }));
+    theme.drawPolygonFill(g, shiftedPts);
+  }
+}
+
+/**
+ * Dispatches hole themed composite border rendering (Pass 2).
+ */
+export function renderHoleBorder(
+  g: Phaser.GameObjects.Graphics,
+  theme: HoleTheme,
+  hole: Hole,
+  offsetY: number
+): void {
+  if (hole.type === 'circle') {
+    theme.drawCircleBorder(g, hole.cx, hole.cy + offsetY, hole.radius);
+  } else if (hole.type === 'tri') {
+    theme.drawPolygonBorder(g, [
+      { x: hole.p1.x, y: hole.p1.y + offsetY },
+      { x: hole.p2.x, y: hole.p2.y + offsetY },
+      { x: hole.p3.x, y: hole.p3.y + offsetY },
+    ]);
+  } else {
+    // Rect, Ellipse, Bean all provide world-space polygon vertices
+    const shiftedPts = hole.polygon.map((pt) => ({
+      x: pt.x,
+      y: pt.y + offsetY,
+    }));
+    theme.drawPolygonBorder(g, shiftedPts);
+  }
+}
+
+/**
+ * Dispatches complete hole rendering (fill + border).
  */
 export function renderHole(
   g: Phaser.GameObjects.Graphics,
@@ -446,21 +500,6 @@ export function renderHole(
   hole: Hole,
   offsetY: number
 ): void {
-  if (hole.type === 'circle') {
-    theme.drawCircleHole(g, hole.cx, hole.cy + offsetY, hole.radius);
-  } else if (hole.type === 'tri') {
-    theme.drawTriHole(
-      g,
-      { x: hole.p1.x, y: hole.p1.y + offsetY },
-      { x: hole.p2.x, y: hole.p2.y + offsetY },
-      { x: hole.p3.x, y: hole.p3.y + offsetY }
-    );
-  } else {
-    // Rect, Ellipse, Bean all provide world-space polygon vertices
-    const shiftedPts = hole.polygon.map((pt) => ({
-      x: pt.x,
-      y: pt.y + offsetY,
-    }));
-    theme.drawPolygonHole(g, shiftedPts);
-  }
+  renderHoleFill(g, theme, hole, offsetY);
+  renderHoleBorder(g, theme, hole, offsetY);
 }
