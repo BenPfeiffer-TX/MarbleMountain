@@ -149,9 +149,18 @@ export interface HoleTheme {
   ): void;
 }
 
+export interface BackgroundTheme {
+  id: string;
+  name: string;
+  textureKey: string;
+  hasPaperOverlay: boolean;
+  ensureTexture(textures: Phaser.Textures.TextureManager, width?: number, height?: number): string;
+}
+
 export interface GameTheme {
   id: string;
   name: string;
+  background?: BackgroundTheme;
   marble: MarbleTheme;
   bar: BarTheme;
   button: ButtonTheme;

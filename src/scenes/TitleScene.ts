@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
 import { createTactileButton } from '../ui/TactileButton';
+import { createTriangleButton } from '../ui/TriangleButton';
+import { ThemeManager } from '../themes/themeManager';
 
 /**
  * TUNABLE TITLE SCREEN CONFIGURATION
@@ -124,8 +126,8 @@ export class TitleScene extends Phaser.Scene {
 
     const fontStack = '"Quicksand", "Nunito", "ui-rounded", -apple-system, BlinkMacSystemFont, sans-serif';
 
-    // Options Header
-    const header = this.add.text(width / 2, 340, 'Options', {
+    // 1. Options Header
+    const header = this.add.text(width / 2, 160, 'Options', {
       fontFamily: fontStack,
       fontSize: '56px',
       fontStyle: '900',
@@ -133,36 +135,143 @@ export class TitleScene extends Phaser.Scene {
       align: 'center',
     });
     header.setOrigin(0.5);
+    this.optionsContainer.add(header);
 
-    // "Not yet implemented!" card
-    const cardBg = this.add.graphics();
-    cardBg.fillStyle(0x3a2c1d, 0.08);
-    cardBg.fillRoundedRect(width / 2 - 220, 460, 440, 160, 20);
-    cardBg.lineStyle(2, 0x9c6638, 0.25);
-    cardBg.strokeRoundedRect(width / 2 - 220, 460, 440, 160, 20);
+    const centerX = width / 2;
 
-    const msg = this.add.text(width / 2, 540, 'Not yet implemented!', {
-      fontFamily: fontStack,
-      fontSize: '24px',
-      fontStyle: '700',
-      color: '#5c4331',
-      align: 'center',
-    });
-    msg.setOrigin(0.5);
+    // Helper to build each texture selection option row
+    const createOptionRow = (
+      labelStr: string,
+      initialValueStr: string,
+      rowY: number,
+      onCycle: (dir: 1 | -1) => string
+    ) => {
+      // 1. Category label
+      const catLabel = this.add.text(centerX, rowY, labelStr, {
+        fontFamily: fontStack,
+        fontSize: '18px',
+        fontStyle: '800',
+        color: '#7c5e47',
+        letterSpacing: 3,
+        align: 'center',
+      });
+      catLabel.setOrigin(0.5);
+      this.optionsContainer.add(catLabel);
+
+      // 2. Value display badge card
+      const badgeW = 340;
+      const badgeH = 58;
+      const badgeR = 16;
+      const badgeY = rowY + 48;
+
+      const badgeContainer = this.add.container(centerX, badgeY);
+
+      // Shadow
+      const badgeShadow = this.add.graphics();
+      badgeShadow.fillStyle(0x3a2c1d, 0.14);
+      badgeShadow.fillRoundedRect(-badgeW / 2, -badgeH / 2 + 3, badgeW, badgeH, badgeR);
+      badgeContainer.add(badgeShadow);
+
+      // Inset plate
+      const badgeBg = this.add.graphics();
+      badgeBg.fillStyle(0xfdfaf4, 0.92);
+      badgeBg.fillRoundedRect(-badgeW / 2, -badgeH / 2, badgeW, badgeH, badgeR);
+      badgeBg.lineStyle(1.5, 0x9c6638, 0.35);
+      badgeBg.strokeRoundedRect(-badgeW / 2, -badgeH / 2, badgeW, badgeH, badgeR);
+      badgeContainer.add(badgeBg);
+
+      // Text label
+      const valueText = this.add.text(0, 0, initialValueStr, {
+        fontFamily: fontStack,
+        fontSize: '24px',
+        fontStyle: '900',
+        color: '#3a2415',
+        align: 'center',
+      });
+      valueText.setOrigin(0.5);
+      badgeContainer.add(valueText);
+
+      this.optionsContainer.add(badgeContainer);
+
+      // 3. Two Triangle Buttons (using active Bar texture) directly UNDER each option
+      const triBtnY = badgeY + 62;
+      const triSpacing = 68; // Horizontal offset from center
+
+      const leftBtn = createTriangleButton(this, {
+        x: centerX - triSpacing,
+        y: triBtnY,
+        direction: 'left',
+        size: 44,
+        onPointerDown: () => {
+          const nextName = onCycle(-1);
+          valueText.setText(nextName);
+          this.tweens.add({
+            targets: valueText,
+            scale: { from: 1.15, to: 1.0 },
+            duration: 160,
+            ease: 'Back.easeOut',
+          });
+        },
+      });
+
+      const rightBtn = createTriangleButton(this, {
+        x: centerX + triSpacing,
+        y: triBtnY,
+        direction: 'right',
+        size: 44,
+        onPointerDown: () => {
+          const nextName = onCycle(1);
+          valueText.setText(nextName);
+          this.tweens.add({
+            targets: valueText,
+            scale: { from: 1.15, to: 1.0 },
+            duration: 160,
+            ease: 'Back.easeOut',
+          });
+        },
+      });
+
+      this.optionsContainer.add([leftBtn, rightBtn]);
+
+      return { valueText };
+    };
+
+    // Row 1: Background
+    createOptionRow(
+      'BACKGROUND',
+      ThemeManager.getActiveBackground().name,
+      250,
+      (dir) => ThemeManager.cycleBackground(dir).name
+    );
+
+    // Row 2: Ball
+    createOptionRow(
+      'BALL',
+      ThemeManager.getActiveBall().name,
+      450,
+      (dir) => ThemeManager.cycleBall(dir).name
+    );
+
+    // Row 3: Surface (Bar)
+    createOptionRow(
+      'SURFACE',
+      ThemeManager.getActiveSurfacePackage().name,
+      650,
+      (dir) => ThemeManager.cycleSurface(dir).name
+    );
 
     // Back Button (tactile squircle)
     const backButton = createTactileButton(this, {
-      x: width / 2,
-      y: TITLE_CONFIG.backButtonY,
-      w: TITLE_CONFIG.buttonWidth,
-      h: TITLE_CONFIG.buttonHeight,
+      x: centerX,
+      y: 870,
+      w: 240,
+      h: 68,
       radius: TITLE_CONFIG.buttonRadius,
       label: 'Back',
       fontSize: TITLE_CONFIG.buttonTextFontSize,
       onPointerDown: () => this.handleBackFromOptions(),
     });
-
-    this.optionsContainer.add([header, cardBg, msg, backButton]);
+    this.optionsContainer.add(backButton);
   }
 
   private handlePlay(): void {

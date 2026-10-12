@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { BACKGROUND_CONFIG, GradientColorStop } from '../config/backgroundConfig';
+import { ThemeManager } from '../themes/themeManager';
 
 /**
  * PERSISTENT BACKGROUND SCENE
@@ -13,6 +14,7 @@ export class BackgroundScene extends Phaser.Scene {
   private paperOverlay?: Phaser.GameObjects.Graphics;
   private currentScrollSpeed: number = BACKGROUND_CONFIG.scrollSpeed;
   private isPaused: boolean = false;
+  private unsubscribeTheme?: () => void;
 
   private static readonly TEXTURE_KEY = 'diffusePastelGradient';
 
@@ -23,23 +25,36 @@ export class BackgroundScene extends Phaser.Scene {
   create(): void {
     const { width, height } = this.scale;
 
-    // 1. Generate or retrieve gradient texture
-    this.ensureGradientTexture();
+    // 1. Procedural Tactile Construction Paper Grain Overlay
+    if (BACKGROUND_CONFIG.paperTexture.enabled) {
+      this.createPaperTextureOverlay(width, height);
+    }
 
-    // 2. Continuous Scrolling TileSprite
+    // 2. Continuous Scrolling TileSprite (initialized with active background theme)
+    const activeBg = ThemeManager.getActiveBackground();
+    const key = activeBg.ensureTexture(this.textures, width, height);
+
     this.bgTileSprite = this.add.tileSprite(
       width / 2,
       height / 2,
       width,
       height,
-      BackgroundScene.TEXTURE_KEY
+      key
     );
     this.bgTileSprite.setDepth(0);
 
-    // 3. Procedural Tactile Construction Paper Grain Overlay
-    if (BACKGROUND_CONFIG.paperTexture.enabled) {
-      this.createPaperTextureOverlay(width, height);
+    if (this.paperOverlay) {
+      this.paperOverlay.setVisible(activeBg.hasPaperOverlay);
     }
+
+    // 3. Subscribe to dynamic background theme switches
+    this.unsubscribeTheme = ThemeManager.onBackgroundChanged(() => {
+      this.applyActiveBackgroundTheme();
+    });
+
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      if (this.unsubscribeTheme) this.unsubscribeTheme();
+    });
 
     // 4. Ensure background stays permanently at the bottom of the scene stack
     this.scene.sendToBack();
@@ -51,10 +66,25 @@ export class BackgroundScene extends Phaser.Scene {
   }
 
   /**
+   * Applies the current active background theme to the TileSprite and paper overlay.
+   */
+  public applyActiveBackgroundTheme(): void {
+    const activeBg = ThemeManager.getActiveBackground();
+    const key = activeBg.ensureTexture(this.textures, this.scale.width, this.scale.height);
+
+    if (this.bgTileSprite) {
+      this.bgTileSprite.setTexture(key);
+    }
+    if (this.paperOverlay) {
+      this.paperOverlay.setVisible(activeBg.hasPaperOverlay);
+    }
+  }
+
+  /**
    * Generates seamless diffuse pastel gradient canvas texture.
    * Cached by Phaser TextureManager so it is only rendered once.
    */
-  private ensureGradientTexture(): void {
+  public ensureGradientTexture(): void {
     const key = BackgroundScene.TEXTURE_KEY;
     if (this.textures.exists(key)) return;
 
